@@ -60,28 +60,52 @@ export default StyleSheet.create({
     marginBottom: SPACING.md,
   },
   sectionTitle: { fontSize: FONTS.base, fontWeight: '700', color: COLORS.textPrimary },
-  viewHistory: { flexDirection: 'row', alignItems: 'center' },
-  historyText: { fontSize: FONTS.sm, color: COLORS.textMuted },
-
-  // ── Order Status Grid ────────────────────────────────────
-  statusGrid: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: SPACING.xs },
-  statusItem: { alignItems: 'center', width: '20%', paddingVertical: SPACING.xs },
-  statusText: { fontSize: FONTS.xs, color: COLORS.textSecondary, marginTop: 6, textAlign: 'center', lineHeight: 15 },
-
-  // ── Tier Card ────────────────────────────────────────────
-  tierCard: {
+  // ── Purchase Grid ────────────────────────────────────────
+  purchaseGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: SPACING.base,
-    marginTop: SPACING.md,
-    backgroundColor: COLORS.bgDark,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.base,
+    paddingBottom: SPACING.sm,
   },
-  tierIcon: { marginRight: SPACING.sm },
-  tierName: { flex: 1, fontSize: FONTS.sm, fontWeight: '700', color: COLORS.white },
-  tierReward: { flexDirection: 'row', alignItems: 'center' },
-  rewardText: { fontSize: FONTS.xs, color: COLORS.textMuted, marginRight: 3 },
+  purchaseItem: {
+    width: '24%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  purchaseIconWrap: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: 10,
+  },
+  purchaseLabel: {
+    fontSize: 12,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+  purchaseBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -8,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    backgroundColor: '#F06C45',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  purchaseBadgeText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
 
   // ── Menu Items ───────────────────────────────────────────
   menuItem: {

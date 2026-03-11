@@ -18,6 +18,7 @@ import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import HelpCenterScreen from '../screens/HelpCenterScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
+import CategoryProductsScreen from '../screens/CategoryProductsScreen';
 
 import CustomTabBar from '../components/CustomTabBar';
 import { withScreenTransition } from '../components/ScreenTransition';
@@ -41,6 +42,7 @@ const PaymentMethodsScreenAnimated = withScreenTransition(PaymentMethodsScreen);
 const HelpCenterScreenAnimated = withScreenTransition(HelpCenterScreen);
 const ContactUsScreenAnimated = withScreenTransition(ContactUsScreen);
 const ProductDetailScreenAnimated = withScreenTransition(ProductDetailScreen);
+const CategoryProductsScreenAnimated = withScreenTransition(CategoryProductsScreen);
 
 // Main Tab Bar Navigator
 const TabNavigator = () => (
@@ -77,6 +79,7 @@ const AppNavigator = () => {
       <Stack.Screen name="ContactUs" component={ContactUsScreenAnimated} />
       <Stack.Screen name="SubNotifications" component={NotificationsScreenAnimated} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreenAnimated} />
+      <Stack.Screen name="CategoryProducts" component={CategoryProductsScreenAnimated} />
     </Stack.Navigator>
   );
 };

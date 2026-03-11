@@ -167,6 +167,16 @@ export const apiService = {
     return response.data;
   },
 
+  getUserCoupons: async (userId) => {
+    const response = await api.get(`api.php?action=get_user_coupons&user_id=${userId}`);
+    return response.data;
+  },
+
+  claimCoupon: async (userId, couponId) => {
+    const response = await api.post('api.php?action=claim_coupon', { user_id: userId, coupon_id: couponId });
+    return response.data;
+  },
+
   getAddresses: async (userId) => {
     const response = await api.get(`api.php?action=get_addresses&user_id=${userId}`);
     return response.data;
