@@ -1,5 +1,7 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 import { COLORS, FONTS, RADIUS, SPACING, SHADOW } from './theme';
+
+const { width } = Dimensions.get('window');
 
 export default StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
@@ -39,7 +41,7 @@ export default StyleSheet.create({
   brandIconPlaceholder: {
     width: 60,
     height: 60,
-    backgroundColor: 'transparent', // ไม่มีพื้นหลังตามสไตล์ใหม่
+    backgroundColor: 'transparent',
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
@@ -70,50 +72,78 @@ export default StyleSheet.create({
   filterIconBtn: { paddingHorizontal: SPACING.base },
 
   // ── Product Grid ─────────────────────────────────────────
-  productList: { padding: SPACING.sm },
+  productList: { paddingHorizontal: 15, paddingTop: 10 },
   productCard: {
-    flex: 1,
-    margin: SPACING.xs,
+    width: (width - 30 - 15) / 2,
+    marginBottom: 22,
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
     ...SHADOW.card,
+    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
   },
-  productImageContainer: { width: '100%', aspectRatio: 1, backgroundColor: COLORS.bg },
-  productImage: { width: '100%', height: '100%', resizeMode: 'contain' },
+  productImageContainer: { 
+    width: '100%', 
+    aspectRatio: 1.1, 
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+  },
+  productImage: { 
+    width: '90%', 
+    height: '90%', 
+    resizeMode: 'contain'
+  },
   soldBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 10,
+    right: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    paddingHorizontal: 5,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    paddingHorizontal: 4,
     paddingVertical: 2,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: 4,
   },
-  soldText: { fontSize: FONTS.xs, color: COLORS.textSecondary, marginLeft: 2, fontWeight: '600' },
+  soldText: { 
+    fontSize: 11, 
+    color: '#999', 
+    marginLeft: 3, 
+    fontWeight: '500' 
+  },
 
-  productInfo: { padding: SPACING.sm },
-  productBrand: { fontSize: FONTS.sm, fontWeight: '800', color: COLORS.textPrimary },
-  productName: { fontSize: FONTS.xs, color: COLORS.textSecondary, lineHeight: 18, marginVertical: 3, minHeight: 32 },
-  priceContainer: { marginTop: 4 },
-  priceLabel: { fontSize: FONTS.xs, color: COLORS.textMuted },
-  priceRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  priceValue: { fontSize: FONTS.base, fontWeight: '800', color: COLORS.textPrimary, marginRight: 3 },
-
-  heartBtn: {
-    position: 'absolute',
-    bottom: SPACING.sm,
-    right: SPACING.sm,
+  productInfo: { 
+    padding: 12,
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.full,
-    padding: SPACING.xs,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
+  },
+  productBrand: { fontSize: 15, fontWeight: '700', color: '#000' },
+  productName: { 
+    fontSize: 13, 
+    color: '#666', 
+    lineHeight: 18, 
+    marginTop: 2,
+    height: 36,
+  },
+  priceContainer: { marginTop: 15 },
+  priceLabel: { fontSize: 12, color: '#999', marginBottom: 4 },
+  priceRow: { flexDirection: 'row', alignItems: 'center' },
+  productCurrency: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#000',
+    marginRight: 4,
+  },
+  priceValue: { 
+    fontSize: 18,
+    fontWeight: '800', 
+    color: '#000',
+    marginRight: 6,
   },
 });

@@ -1,5 +1,7 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform, Dimensions } from 'react-native';
 import { SPACING } from './theme';
+
+const { width } = Dimensions.get('window');
 
 export default StyleSheet.create({
   container: {
@@ -31,25 +33,6 @@ export default StyleSheet.create({
   },
   iconButton: {
     padding: 2,
-  },
-  installmentChip: {
-    marginLeft: 16,
-    marginTop: 4,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E6E6E6',
-  },
-  installmentChipText: {
-    fontSize: 13,
-    color: '#575757',
-    fontWeight: '700',
   },
   heroSection: {
     paddingHorizontal: 12,
@@ -211,39 +194,6 @@ export default StyleSheet.create({
   sectionInner: {
     paddingBottom: 10,
   },
-  sectionTopSpacing: {
-    paddingTop: 6,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  subSectionTitle: {
-    fontSize: 16,
-    color: '#151515',
-    fontWeight: '800',
-  },
-  sectionSub: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#7B7B7B',
-  },
-  viewMoreText: {
-    fontSize: 14,
-    color: '#646464',
-    textDecorationLine: 'underline',
-  },
-  reviewPhotoRow: {
-    paddingTop: 14,
-    gap: 10,
-  },
-  reviewThumbnail: {
-    width: 180,
-    height: 160,
-    borderRadius: 12,
-    backgroundColor: '#F1F1F1',
-  },
   reviewScoreCard: {
     marginTop: 16,
     paddingHorizontal: 20,
@@ -279,6 +229,7 @@ export default StyleSheet.create({
   },
   fitSection: {
     marginTop: 24,
+    marginBottom: 10,
   },
   fitRow: {
     flexDirection: 'row',
@@ -310,43 +261,45 @@ export default StyleSheet.create({
     color: '#4D4D4D',
   },
   reviewCard: {
-    marginTop: 24,
-    paddingTop: 16,
+    marginTop: 20,
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#EAEAEA',
+  },
+  reviewContentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  reviewTextContent: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  reviewSidePhoto: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
   },
   reviewTop: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
   reviewDate: {
     marginLeft: 12,
     fontSize: 13,
     color: '#8C8C8C',
   },
-  reviewMeta: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#5D5D5D',
-  },
-  fitBadge: {
-    marginTop: 14,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#F3F3F3',
-  },
-  fitBadgeText: {
-    fontSize: 13,
-    color: '#353535',
+  reviewUser: {
+    fontSize: 15,
     fontWeight: '700',
+    color: '#111',
   },
   reviewComment: {
-    marginTop: 14,
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#202020',
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#444',
   },
   moreReviewButton: {
     marginTop: 20,
@@ -360,7 +313,7 @@ export default StyleSheet.create({
   moreReviewButtonText: {
     fontSize: 16,
     color: '#1A1A1A',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   detailGrid: {
     flexDirection: 'row',
@@ -377,95 +330,10 @@ export default StyleSheet.create({
     color: '#7F7F7F',
     marginBottom: 4,
   },
-  detailLink: {
-    fontSize: 16,
-    color: '#1D1D1D',
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
   detailValue: {
     fontSize: 16,
     color: '#1D1D1D',
-    lineHeight: 22,
-  },
-  linkSection: {
-    backgroundColor: '#FFFFFF',
-    marginTop: 10,
-    paddingHorizontal: 16,
-  },
-  linkRow: {
-    minHeight: 60,
-    borderTopWidth: 1,
-    borderTopColor: '#ECECEC',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  linkRowText: {
-    fontSize: 16,
-    color: '#141414',
-    fontWeight: '700',
-  },
-  linkPanel: {
-    paddingBottom: 14,
-  },
-  linkPanelText: {
-    fontSize: 14,
-    color: '#5F5F5F',
-    lineHeight: 20,
-  },
-  saleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  saleSize: {
-    fontSize: 14,
-    color: '#191919',
-  },
-  salePrice: {
-    fontSize: 16,
-    color: '#191919',
-    fontWeight: '800',
-  },
-  promoCard: {
-    marginTop: 16,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#EEF2D8',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  promoIconBox: {
-    width: 50,
-    height: 34,
-    borderRadius: 6,
-    backgroundColor: '#1C1C1C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    transform: [{ rotate: '-12deg' }],
-  },
-  promoIconText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  promoContent: {
-    flex: 1,
-  },
-  promoTitle: {
-    fontSize: 16,
-    color: '#1A1A1A',
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  promoText: {
-    fontSize: 13,
-    color: '#4E5543',
-    lineHeight: 18,
+    fontWeight: '600',
   },
   relatedSection: {
     marginTop: 20,
@@ -481,49 +349,6 @@ export default StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  relatedCard: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-  },
-  relatedImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'contain',
-  },
-  relatedBrand: {
-    marginTop: 10,
-    fontSize: 15,
-    color: '#171717',
-    fontWeight: '800',
-  },
-  relatedName: {
-    marginTop: 2,
-    fontSize: 14,
-    lineHeight: 18,
-    color: '#3F3F3F',
-    minHeight: 36,
-  },
-  relatedPriceLabel: {
-    marginTop: 16,
-    fontSize: 12,
-    color: '#7B7B7B',
-  },
-  relatedPriceRow: {
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  relatedPrice: {
-    fontSize: 18,
-    color: '#151515',
-    fontWeight: '800',
   },
   bottomActionBar: {
     position: 'absolute',
@@ -543,11 +368,6 @@ export default StyleSheet.create({
   favoriteColumn: {
     width: 48,
     alignItems: 'center',
-  },
-  favoriteCount: {
-    marginTop: 4,
-    fontSize: 14,
-    color: '#232323',
   },
   sellButton: {
     flex: 1,
@@ -581,7 +401,7 @@ export default StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   sizeModalContent: {
-    height: '70%',
+    height: '80%',
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -610,8 +430,9 @@ export default StyleSheet.create({
     borderBottomColor: '#111111',
   },
   modalTabText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#A9A9A9',
+    fontWeight: '700',
   },
   modalTabTextActive: {
     color: '#161616',
@@ -621,15 +442,15 @@ export default StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    paddingVertical: 16,
   },
   briefImg: {
-    width: 70,
-    height: 50,
+    width: 60,
+    height: 40,
     resizeMode: 'contain',
     marginRight: 12,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 4,
   },
   briefInfo: {
     flex: 1,
@@ -641,23 +462,23 @@ export default StyleSheet.create({
   },
   briefMeta: {
     marginTop: 2,
-    fontSize: 13,
+    fontSize: 12,
     color: '#929292',
+    fontWeight: '500',
   },
   sizeTabs: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-    gap: 8,
+    paddingVertical: 12,
+    gap: 10,
   },
   sizeTab: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: 100,
+    backgroundColor: '#F5F5F5',
     borderWidth: 1,
-    borderColor: '#DEDEDE',
-    backgroundColor: '#FFFFFF',
+    borderColor: '#F0F0F0',
   },
   sizeTabActive: {
     backgroundColor: '#111111',
@@ -665,101 +486,55 @@ export default StyleSheet.create({
   },
   sizeTabText: {
     fontSize: 14,
-    color: '#3C3C3C',
+    color: '#666',
+    fontWeight: '600',
   },
   sizeTabTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
   },
   sizeGridContent: {
-    paddingHorizontal: 10,
-    paddingBottom: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 20,
   },
   sizeItem: {
     width: '31.3%',
     margin: '1%',
-    minHeight: 90,
-    borderRadius: 8,
+    minHeight: 100,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E2E2',
+    borderColor: '#EFEFEF',
     backgroundColor: '#FFFFFF',
-    paddingTop: 12,
-    paddingHorizontal: 8,
+    padding: 12,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   activeSizeItem: {
     borderWidth: 2,
     borderColor: '#191919',
   },
-  disabledSizeItem: {
-    backgroundColor: '#FAFAFA',
-  },
-  sizeItemTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
   sizeText: {
     fontSize: 15,
     color: '#1B1B1B',
-    fontWeight: '600',
-  },
-  disabledSizeText: {
-    color: '#B7B7B7',
-  },
-  sizePrice: {
-    marginTop: 10,
-    fontSize: 15,
-    color: '#20B84C',
     fontWeight: '700',
   },
-  disabledSizePrice: {
-    color: '#BFBFBF',
+  sizePrice: {
+    fontSize: 15,
+    color: '#10D100',
+    fontWeight: '700',
   },
   confirmBuyBtn: {
     marginHorizontal: 16,
-    marginBottom: 16,
-    height: 70,
-    borderRadius: 10,
+    marginBottom: 30,
+    height: 56,
+    borderRadius: 12,
     backgroundColor: '#10D100',
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  confirmBtnLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  flashBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-  },
-  confirmBtnMainText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  confirmBtnRight: {
-    alignItems: 'flex-end',
   },
   confirmBtnPrice: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#FFFFFF',
     fontWeight: '800',
-  },
-  confirmBtnSub: {
-    marginTop: 2,
-    fontSize: 13,
-    color: '#EDFFED',
-  },
-  reviewUser: {
-    fontWeight: "600",
-    fontSize: 14,
-    marginTop: 4
   },
 });

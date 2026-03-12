@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   RefreshControl,
   SafeAreaView,
   Text,
@@ -12,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../api/apiService';
 import ConfirmModal from '../components/ConfirmModal';
+import ProductCard from '../components/ProductCard';
 import styles from '../styles/CategoryProductsScreen.styles';
 
 const CategoryProductsScreen = ({ navigation, route }) => {
@@ -45,8 +45,6 @@ const CategoryProductsScreen = ({ navigation, route }) => {
         if (Array.isArray(wishlistData)) {
           setWishlistIds(wishlistData.map((item) => item.id));
         }
-      } else {
-        setWishlistIds([]);
       }
     } catch (error) {
       console.error('Load category products error:', error);
@@ -80,47 +78,6 @@ const CategoryProductsScreen = ({ navigation, route }) => {
     }
   };
 
-  const renderProduct = ({ item }) => {
-    const isWishlisted = wishlistIds.includes(item.id);
-
-    return (
-      <TouchableOpacity
-        style={styles.productCard}
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-      >
-        <View style={styles.productImageContainer}>
-          <Image source={{ uri: item.image }} style={styles.productImage} />
-          <View style={styles.soldBadge}>
-            <Ionicons name="trending-up" size={10} color="#22C55E" />
-            <Text style={styles.soldText}>{item.sold || '0'} sold</Text>
-          </View>
-        </View>
-        <View style={styles.productInfo}>
-          <Text style={styles.productBrand}>{item.brand}</Text>
-          <Text style={styles.productName} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>ราคาเริ่มต้น</Text>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceValue}>฿{parseFloat(item.price || 0).toLocaleString()}</Text>
-              <Ionicons name="flash" size={11} color="#22C55E" />
-            </View>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.heartBtn} onPress={() => toggleWishlist(item.id)}>
-          <Ionicons
-            name={isWishlisted ? 'heart' : 'heart-outline'}
-            size={18}
-            color={isWishlisted ? '#EF4444' : '#999999'}
-          />
-        </TouchableOpacity>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -138,10 +95,18 @@ const CategoryProductsScreen = ({ navigation, route }) => {
       ) : (
         <FlatList
           data={products}
-          renderItem={renderProduct}
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              isWishlisted={wishlistIds.includes(item.id)}
+              onWishlistPress={toggleWishlist}
+              onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+            />
+          )}
           keyExtractor={(item) => String(item.id)}
           numColumns={2}
           contentContainerStyle={styles.listContent}
+          columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 15 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0D0D0D" />}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>

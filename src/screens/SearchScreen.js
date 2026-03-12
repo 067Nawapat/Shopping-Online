@@ -4,7 +4,6 @@ import {
   Text,
   SafeAreaView,
   ScrollView,
-  Image,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
@@ -14,19 +13,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../api/apiService';
 import ConfirmModal from '../components/ConfirmModal';
+import ProductCard from '../components/ProductCard';
 import styles from '../styles/SearchScreen.styles';
 
 const TABS = ['ทั้งหมด', 'Streetwear', 'Luxury', 'ของสะสม', 'มือสอง'];
 
-const SearchScreen = () => {
+const SearchScreen = ({ navigation }) => {
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [wishlistIds, setWishlistIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [activeFilter, setActiveFilter] = useState(1);
-  const [wishlistIds, setWishlistIds] = useState([]);
   const [user, setUser] = useState(null);
   const [infoModal, setInfoModal] = useState(null);
 
@@ -53,10 +53,11 @@ const SearchScreen = () => {
     setLoading(true);
     const userData = await apiService.getUser();
     setUser(userData);
-    if (userData) {
-      fetchWishlist(userData.id);
-    }
-    await Promise.all([fetchProducts(), fetchBrands()]);
+    await Promise.all([
+      fetchProducts(), 
+      fetchBrands(),
+      userData ? fetchWishlist(userData.id) : Promise.resolve()
+    ]);
     setLoading(false);
   };
 
@@ -68,6 +69,24 @@ const SearchScreen = () => {
       }
     } catch (error) {
       console.error('Fetch wishlist error:', error);
+    }
+  };
+
+  const toggleWishlist = async (productId) => {
+    if (!user) {
+      setInfoModal({ title: 'แจ้งเตือน', message: 'กรุณาเข้าสู่ระบบเพื่อใช้งานสิ่งที่อยากได้' });
+      return;
+    }
+
+    try {
+      const result = await apiService.toggleWishlist(user.id, productId);
+      if (result.status === 'added') {
+        setWishlistIds(prev => [...prev, productId]);
+      } else if (result.status === 'removed') {
+        setWishlistIds(prev => prev.filter(id => id !== productId));
+      }
+    } catch (error) {
+      console.error('Toggle wishlist error:', error);
     }
   };
 
@@ -83,8 +102,6 @@ const SearchScreen = () => {
 
   const fetchBrands = async () => {
     try {
-      // Assuming brands can be derived from products or there's a specific logic.
-      // For now, let's use the static list or extract unique brands from products.
       const data = await apiService.getProducts();
       const uniqueBrands = [...new Set(data.map(item => item.brand))].filter(Boolean).map((name, index) => ({ id: String(index), name }));
       setBrands(uniqueBrands.slice(0, 10));
@@ -104,36 +121,17 @@ const SearchScreen = () => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (user) await fetchWishlist(user.id);
+    const userData = await apiService.getUser();
     if (query) {
       await handleSearch(query);
     } else {
       await fetchProducts();
     }
+    if (userData) await fetchWishlist(userData.id);
     setRefreshing(false);
-  }, [user, query]);
-
-  const toggleWishlist = async (productId) => {
-    if (!user) {
-      setInfoModal({ title: 'แจ้งเตือน', message: 'กรุณาเข้าสู่ระบบเพื่อใช้งานสิ่งที่อยากได้' });
-      return;
-    }
-
-    try {
-      const result = await apiService.toggleWishlist(user.id, productId);
-      if (result.status === 'added' || result.status === 'success') {
-        setWishlistIds(prev => [...prev, productId]);
-      } else if (result.status === 'removed') {
-        setWishlistIds(prev => prev.filter(id => id !== productId));
-      }
-    } catch (error) {
-      console.error('Toggle wishlist error:', error);
-    }
-  };
+  }, [query]);
 
   const filteredProducts = useMemo(() => {
-    // If we have categories/tabs logic on server, we should use that.
-    // For now, simple client-side filtering if needed, but search usually happens on server.
     return products;
   }, [products]);
 
@@ -142,47 +140,6 @@ const SearchScreen = () => {
     { id: 1, label: 'สำหรับคุณ', icon: 'sparkles', iconColor: '#fff' },
     { id: 2, label: 'ราคาต่ำ-สูง', icon: 'arrow-up', iconColor: '#333' },
   ];
-
-  const renderProduct = useCallback(
-    ({ item }) => {
-      const isWishlisted = wishlistIds.includes(item.id);
-      return (
-        <TouchableOpacity style={styles.productCard} activeOpacity={0.85}>
-          <View style={styles.productImageContainer}>
-            <Image source={{ uri: item.image }} style={styles.productImage} />
-            <View style={styles.soldBadge}>
-              <Ionicons name="trending-up" size={10} color="#22C55E" />
-              <Text style={styles.soldText}>{item.sold || '0'} sold</Text>
-            </View>
-          </View>
-          <View style={styles.productInfo}>
-            <Text style={styles.productBrand}>{item.brand}</Text>
-            <Text style={styles.productName} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <View style={styles.priceContainer}>
-              <Text style={styles.priceLabel}>ราคาเริ่มต้น</Text>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceValue}>฿{parseFloat(item.price).toLocaleString()}</Text>
-                <Ionicons name="flash" size={11} color="#22C55E" />
-              </View>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.heartBtn}
-            onPress={() => toggleWishlist(item.id)}
-          >
-            <Ionicons
-              name={isWishlisted ? 'heart' : 'heart-outline'}
-              size={18}
-              color={isWishlisted ? '#EF4444' : '#999'}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      );
-    },
-    [wishlistIds, user]
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -264,11 +221,19 @@ const SearchScreen = () => {
       ) : (
         <FlatList
           data={filteredProducts}
-          renderItem={renderProduct}
+          renderItem={({ item }) => (
+            <ProductCard 
+              product={item} 
+              isWishlisted={wishlistIds.includes(item.id)}
+              onWishlistPress={toggleWishlist}
+              onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+            />
+          )}
           keyExtractor={(item) => String(item.id)}
           numColumns={2}
           contentContainerStyle={[styles.productList, { paddingBottom: 110 }]}
           showsVerticalScrollIndicator={false}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

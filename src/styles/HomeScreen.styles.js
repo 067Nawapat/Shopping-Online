@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet, Platform } from 'react-native';
 import { COLORS, FONTS, RADIUS, SHADOW, SPACING } from './theme';
 
 const { width } = Dimensions.get('window');
@@ -32,7 +32,7 @@ export default StyleSheet.create({
     height: 44,
     borderRadius: 22,
     overflow: 'hidden',
-    backgroundColor: '#CCFF00', // Neon yellow from SASOM
+    backgroundColor: '#CCFF00',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -66,7 +66,6 @@ export default StyleSheet.create({
     backgroundColor: '#000',
   },
   shortcutIcon: {
-    marginRight: 0, // No icons in SASOM style categories
     display: 'none',
   },
   shortcutTitle: {
@@ -129,60 +128,89 @@ export default StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    paddingTop: 5,
   },
   feedCard: {
     width: (width - 40 - 15) / 2,
     backgroundColor: COLORS.white,
-    borderRadius: 20,
-    marginBottom: 20,
-    overflow: 'hidden',
+    marginBottom: 22,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+    ...SHADOW.card,
+    overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
   },
   feedImageContainer: {
     width: '100%',
-    height: 200,
+    aspectRatio: 1, // ปรับเป็น 1 เพื่อให้รูปจัตุรัสเต็มสวยๆ
     backgroundColor: '#F9F9F9',
-    borderRadius: 20,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
     overflow: 'hidden',
   },
   feedProductImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'cover', // ปรับเป็น cover เพื่อให้รูปเต็มกรอบ
   },
   feedSoldBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 6,
+    zIndex: 1,
   },
   feedSoldText: {
     fontSize: 11,
-    color: '#000',
-    fontWeight: '700',
+        color: '#999',
+        fontWeight: '500',
+    marginLeft: 3,
   },
   feedContent: {
-    paddingVertical: 12,
+    padding: 12,
+    backgroundColor: COLORS.white,
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
   },
   feedBrand: {
     fontSize: 15,
-    fontWeight: '800',
-    color: COLORS.black,
+    fontWeight: '700',
+    color: '#000',
   },
   feedName: {
     fontSize: 13,
     color: '#666',
-    marginTop: 4,
+    marginTop: 2,
     lineHeight: 18,
+    height: 36,
   },
   feedPriceContainer: {
-    marginTop: 8,
+    marginTop: 15,
+  },
+  feedPriceLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
+  },
+  feedPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  feedCurrency: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#000',
+    marginRight: 4,
   },
   feedPrice: {
     fontSize: 18,
-    fontWeight: '900',
-    color: COLORS.black,
+    fontWeight: '800',
+    color: '#000',
+    marginRight: 6,
   },
 });

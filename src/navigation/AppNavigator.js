@@ -19,6 +19,7 @@ import HelpCenterScreen from '../screens/HelpCenterScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CategoryProductsScreen from '../screens/CategoryProductsScreen';
+import WishlistScreen from '../screens/WishlistScreen';
 
 import CustomTabBar from '../components/CustomTabBar';
 import { withScreenTransition } from '../components/ScreenTransition';
@@ -43,6 +44,7 @@ const HelpCenterScreenAnimated = withScreenTransition(HelpCenterScreen);
 const ContactUsScreenAnimated = withScreenTransition(ContactUsScreen);
 const ProductDetailScreenAnimated = withScreenTransition(ProductDetailScreen);
 const CategoryProductsScreenAnimated = withScreenTransition(CategoryProductsScreen);
+const WishlistScreenAnimated = withScreenTransition(WishlistScreen);
 
 // Main Tab Bar Navigator
 const TabNavigator = () => (
@@ -72,6 +74,7 @@ const AppNavigator = () => {
       {/* Sub-screens (Hide Bottom Tab Bar) */}
       <Stack.Screen name="UserInfo" component={UserInfoScreenAnimated} />
       <Stack.Screen name="Coupons" component={CouponsScreenAnimated} />
+      <Stack.Screen name="Wishlist" component={WishlistScreenAnimated} />
       <Stack.Screen name="AddressList" component={AddressListScreenAnimated} />
       <Stack.Screen name="AddAddress" component={AddAddressScreenAnimated} />
       <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreenAnimated} />

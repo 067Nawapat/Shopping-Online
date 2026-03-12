@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
-  Image,
   SafeAreaView,
   ScrollView,
   Text,
@@ -15,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../api/apiService';
 import ConfirmModal from '../components/ConfirmModal';
+import ProductCard from '../components/ProductCard';
 import styles from '../styles/HomeScreen.styles';
 import bannerStyles from '../styles/banner.styles';
 
@@ -24,26 +24,35 @@ const HomeScreen = ({ navigation }) => {
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);
   const [feedProducts, setFeedProducts] = useState([]);
+  const [wishlistIds, setWishlistIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState(null);
   const [infoModal, setInfoModal] = useState(null);
   const [activeBanner, setActiveBanner] = useState(0);
-  const [activeCategory, setActiveCategory] = useState(null);
+  const [activeCategory, setActiveCategory] = useState('all');
 
   const bannerListRef = useRef(null);
   const bannerIndexRef = useRef(0);
+  const isMounted = useRef(true);
 
   useEffect(() => {
+    isMounted.current = true;
     initialLoad();
+    return () => { isMounted.current = false; };
   }, []);
 
   useEffect(() => {
-    if (banners.length <= 1) {
-      return undefined;
+    if (!loading) {
+      fetchHomeProducts(activeCategory);
     }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (banners.length <= 1) return undefined;
 
     const interval = setInterval(() => {
+      if (!isMounted.current) return;
       bannerIndexRef.current = (bannerIndexRef.current + 1) % banners.length;
       bannerListRef.current?.scrollToIndex({
         index: bannerIndexRef.current,
@@ -61,15 +70,16 @@ const HomeScreen = ({ navigation }) => {
     await Promise.all([
       fetchCategories(),
       fetchBanners(),
-      fetchHomeProducts(),
+      userData ? fetchWishlist(userData.id) : Promise.resolve(),
     ]);
-    setLoading(false);
+    await fetchHomeProducts('all');
+    if (isMounted.current) setLoading(false);
   };
 
   const fetchUser = async () => {
     try {
       const userData = await apiService.getUser();
-      setUser(userData);
+      if (isMounted.current) setUser(userData);
       return userData;
     } catch (error) {
       console.error('Fetch user error:', error);
@@ -77,58 +87,89 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const fetchWishlist = async (userId) => {
+    try {
+      const data = await apiService.getWishlist(userId);
+      if (isMounted.current && Array.isArray(data)) {
+        setWishlistIds(data.map(item => item.id));
+      }
+    } catch (error) {
+      console.error('Fetch wishlist error:', error);
+    }
+  };
+
+  const toggleWishlist = async (productId) => {
+    if (!user) {
+      setInfoModal({ title: 'แจ้งเตือน', message: 'กรุณาเข้าสู่ระบบเพื่อใช้งานสิ่งที่อยากได้' });
+      return;
+    }
+
+    try {
+      const result = await apiService.toggleWishlist(user.id, productId);
+      if (result.status === 'added') {
+        setWishlistIds(prev => [...prev, productId]);
+      } else if (result.status === 'removed') {
+        setWishlistIds(prev => prev.filter(id => id !== productId));
+      }
+    } catch (error) {
+      console.error('Toggle wishlist error:', error);
+    }
+  };
+
   const fetchCategories = async () => {
     try {
       const data = await apiService.getCategories();
-      const catList = Array.isArray(data) ? data : [];
-      setCategories(catList);
-      if (catList.length > 0) setActiveCategory(catList[0].id);
+      let catList = Array.isArray(data) ? data : [];
+      catList = [{ id: 'all', name: 'ทั้งหมด' }, ...catList];
+      if (isMounted.current) {
+        setCategories(catList);
+      }
     } catch (error) {
       console.error('Fetch categories error:', error);
-      setCategories([]);
     }
   };
 
   const fetchBanners = async () => {
     try {
       const data = await apiService.getBanners();
-      setBanners(Array.isArray(data) ? data : []);
+      const bannerList = Array.isArray(data) ? data : [];
+      if (isMounted.current) setBanners(bannerList.slice(0, 3));
     } catch (error) {
       console.error('Fetch banners error:', error);
-      setBanners([]);
     }
   };
 
-  const fetchHomeProducts = async () => {
+  const fetchHomeProducts = async (catId) => {
     try {
-      const data = await apiService.getProducts();
-      const productList = Array.isArray(data) ? data : [];
-      setFeedProducts(productList);
+      const actualId = catId === 'all' ? null : catId;
+      const data = await apiService.getProducts(actualId);
+      if (isMounted.current) {
+        let products = Array.isArray(data) ? data : [];
+        if (catId === 'all') {
+          products.sort((a, b) => (parseInt(b.sold) || 0) - (parseInt(a.sold) || 0));
+        }
+        setFeedProducts(products);
+      }
     } catch (error) {
       console.error('Fetch home products error:', error);
-      setFeedProducts([]);
     }
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    const userData = await fetchUser();
     await Promise.all([
-      fetchUser(),
       fetchCategories(),
       fetchBanners(),
-      fetchHomeProducts(),
+      fetchHomeProducts(activeCategory),
+      userData ? fetchWishlist(userData.id) : Promise.resolve(),
     ]);
-    setRefreshing(false);
-  }, []);
+    if (isMounted.current) setRefreshing(false);
+  }, [activeCategory]);
 
   const initials = user?.name
     ? user.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
     : 'SO';
-
-  const shortcutCategories = useMemo(() => {
-    const base = categories.slice(0, 8);
-    return base;
-  }, [categories]);
 
   const handleBannerScrollEnd = (event) => {
     const nextIndex = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
@@ -149,7 +190,6 @@ const HomeScreen = ({ navigation }) => {
             <Text style={bannerStyles.title} numberOfLines={2}>{item.title}</Text>
             <Text style={bannerStyles.description} numberOfLines={1}>{item.subtitle}</Text>
           </View>
-
           <TouchableOpacity 
             style={bannerStyles.cartIcon}
             onPress={() => item.product_id && navigation.navigate('ProductDetail', { productId: item.product_id })}
@@ -185,20 +225,13 @@ const HomeScreen = ({ navigation }) => {
           contentContainerStyle={styles.shortcutList}
           style={styles.shortcutScroll}
         >
-          {shortcutCategories.map((item) => (
+          {categories.slice(0, 8).map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={[
-                styles.shortcutCard,
-                activeCategory === item.id && styles.shortcutCardActive
-              ]}
-              activeOpacity={0.7}
+              style={[styles.shortcutCard, activeCategory === item.id && styles.shortcutCardActive]}
               onPress={() => setActiveCategory(item.id)}
             >
-              <Text style={[
-                styles.shortcutTitle,
-                activeCategory === item.id && styles.shortcutTitleActive
-              ]}>
+              <Text style={[styles.shortcutTitle, activeCategory === item.id && styles.shortcutTitleActive]}>
                 {item.name}
               </Text>
             </TouchableOpacity>
@@ -227,87 +260,61 @@ const HomeScreen = ({ navigation }) => {
                 snapToInterval={screenWidth}
                 snapToAlignment="center"
                 onMomentumScrollEnd={handleBannerScrollEnd}
-                contentContainerStyle={{ paddingHorizontal: 0 }}
-                getItemLayout={(_, index) => ({
-                  length: screenWidth,
-                  offset: screenWidth * index,
-                  index,
-                })}
+                getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
               />
-
-              {banners.length > 1 ? (
+              {banners.length > 1 && (
                 <View style={styles.bannerDots}>
-                  {banners.map((item, index) => (
-                    <View
-                      key={item.id}
-                      style={[styles.bannerDot, index === activeBanner && styles.bannerDotActive]}
-                    />
+                  {banners.map((_, index) => (
+                    <View key={index} style={[styles.bannerDot, index === activeBanner && styles.bannerDotActive]} />
                   ))}
                 </View>
-              ) : null}
+              )}
             </View>
 
             <View style={styles.feedSection}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>สินค้าแนะนำ</Text>
-                <TouchableOpacity
-                  style={styles.viewAllBtn}
-                  onPress={() =>
-                    navigation.navigate('CategoryProducts', {
-                      categoryId: 0,
-                      title: 'สินค้าทั้งหมด',
-                    })
+                <Text style={styles.sectionTitle}>
+                  {activeCategory === 'all' 
+                    ? 'สินค้าแนะนำ' 
+                    : `สินค้าหมวด${categories.find(c => c.id === activeCategory)?.name || ''}`
                   }
+                </Text>
+                <TouchableOpacity 
+                  style={styles.viewAllBtn}
+                  onPress={() => navigation.navigate('CategoryProducts', { 
+                    categoryId: activeCategory === 'all' ? null : activeCategory,
+                    title: activeCategory === 'all' 
+                      ? 'สินค้าทั้งหมด' 
+                      : categories.find(c => c.id === activeCategory)?.name 
+                  })}
                 >
                   <Text style={styles.viewAllText}>ดูทั้งหมด</Text>
                   <Ionicons name="chevron-forward" size={14} color="#9A9A9A" />
                 </TouchableOpacity>
               </View>
-
               <View style={styles.feedGrid}>
-                {feedProducts.map((item) => {
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.feedCard}
-                      activeOpacity={0.9}
+                {feedProducts.length > 0 ? (
+                  feedProducts.slice(0, 6).map((item) => (
+                    <ProductCard 
+                      key={item.id} 
+                      product={item} 
+                      isWishlisted={wishlistIds.includes(item.id)}
+                      onWishlistPress={toggleWishlist}
                       onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-                    >
-                      <View style={styles.feedImageContainer}>
-                        <Image source={{ uri: item.image }} style={styles.feedProductImage} />
-                        <View style={styles.feedSoldBadge}>
-                          <Text style={styles.feedSoldText}>{item.sold || '0'} sold</Text>
-                        </View>
-                      </View>
-                      <View style={styles.feedContent}>
-                        <Text style={styles.feedBrand}>{item.brand}</Text>
-                        <Text style={styles.feedName} numberOfLines={2}>
-                          {item.name}
-                        </Text>
-                        <View style={styles.feedPriceContainer}>
-                          <Text style={styles.feedPrice}>฿{parseFloat(item.price || 0).toLocaleString()}</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                    />
+                  ))
+                ) : (
+                  <View style={{ width: screenWidth - 40, padding: 40, alignItems: 'center' }}>
+                    <Text style={{ color: '#9A9A9A' }}>ไม่พบสินค้าในหมวดหมู่นี้</Text>
+                  </View>
+                )}
               </View>
             </View>
-
             <View style={{ height: 110 }} />
           </>
         )}
       </ScrollView>
-
-      <ConfirmModal
-        visible={!!infoModal}
-        title={infoModal?.title}
-        message={infoModal?.message}
-        confirmText="ตกลง"
-        hideCancel
-        onConfirm={() => setInfoModal(null)}
-        onCancel={() => setInfoModal(null)}
-      />
+      <ConfirmModal visible={!!infoModal} title={infoModal?.title} message={infoModal?.message} onConfirm={() => setInfoModal(null)} />
     </SafeAreaView>
   );
 };

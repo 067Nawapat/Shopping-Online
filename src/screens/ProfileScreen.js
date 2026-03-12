@@ -170,6 +170,12 @@ const ProfileScreen = ({ navigation }) => {
             label="โค้ดส่วนลดและดีล"
             onPress={() => navigation.navigate('Coupons')}
           />
+          {/* เพิ่มปุ่ม สินค้าที่คุณสนใจ ตรงนี้ */}
+          <MenuItem
+            icon="heart-outline"
+            label="สินค้าที่คุณสนใจ"
+            onPress={() => navigation.navigate('Wishlist')}
+          />
         </View>
 
         {/* ── Settings ── */}
