@@ -31,6 +31,7 @@ const AuthScreen = ({ navigation }) => {
         email: user.email,
         name: user.name,
         avatar: user.picture,
+        idToken: user.idToken,
       });
 
       if (res.status === 'success') {

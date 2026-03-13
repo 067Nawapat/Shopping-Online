@@ -27,7 +27,10 @@ export const signInWithGoogle = async () => {
 
   const response = await GoogleSignin.signIn();
   if (isSuccessResponse(response)) {
-    return response.data.user;
+    return {
+      ...response.data.user,
+      idToken: response.data.idToken,
+    };
   }
 
   return null;

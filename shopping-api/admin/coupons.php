@@ -20,6 +20,21 @@ if (isset($_POST['add_coupon'])) {
     }
 }
 
+// Update Coupon Status/Details
+if (isset($_POST['update_coupon'])) {
+    $id = (int)$_POST['coupon_id'];
+    $status = $_POST['status'];
+    $quantity = (int)$_POST['quantity'];
+    $expiry_date = $_POST['expiry_date'] ?: NULL;
+
+    $stmt = $conn->prepare("UPDATE coupons SET status = ?, quantity = ?, expiry_date = ? WHERE id = ?");
+    $stmt->bind_param("sisi", $status, $quantity, $expiry_date, $id);
+    
+    if ($stmt->execute()) {
+        echo "<script>window.location.href='coupons.php';</script>";
+    }
+}
+
 // Delete Coupon
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
@@ -65,9 +80,48 @@ $coupons = $conn->query("SELECT * FROM coupons ORDER BY id DESC");
                         </span>
                     </td>
                     <td>
+                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCoupon-<?= $c['id'] ?>">
+                            แก้ไข
+                        </button>
                         <a href="?delete=<?= $c['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('ยืนยันการลบคูปองนี้?')">
                             <i class="bi bi-trash"></i>
                         </a>
+
+                        <!-- Edit Coupon Modal -->
+                        <div class="modal fade" id="editCoupon-<?= $c['id'] ?>" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <form method="POST">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">แก้ไขคูปอง: <?= $c['code'] ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <input type="hidden" name="coupon_id" value="<?= $c['id'] ?>">
+                                            <div class="mb-3">
+                                                <label class="form-label">สถานะ</label>
+                                                <select name="status" class="form-select">
+                                                    <option value="active" <?= $c['status'] == 'active' ? 'selected' : '' ?>>Active (ใช้งานได้)</option>
+                                                    <option value="expired" <?= $c['status'] == 'expired' ? 'selected' : '' ?>>Expired (หมดอายุ/ระงับ)</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">จำนวนคงเหลือ (ใบ)</label>
+                                                <input type="number" name="quantity" class="form-control" value="<?= $c['quantity'] ?>" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">วันหมดอายุ</label>
+                                                <input type="date" name="expiry_date" class="form-control" value="<?= $c['expiry_date'] ?>">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                                            <button type="submit" name="update_coupon" class="btn btn-primary">บันทึกการเปลี่ยนแปลง</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 <?php endwhile; ?>

@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
-  API_BASE_URL: 'http://YOUR_LAN_IP/shopping-api/',
-  PROMPTPAY_NUMBER: 'CHANGE_PROMPTPAY_NUMBER',
-  TRUE_MONEY_NUMBER: 'CHANGE_TRUE_MONEY_NUMBER',
+  API_BASE_URL: 'http:///shopping-api/',
+  PROMPTPAY_NUMBER: '',
+  TRUE_MONEY_NUMBER: '',
 };

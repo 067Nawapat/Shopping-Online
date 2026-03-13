@@ -75,10 +75,11 @@ const ProfileScreen = ({ navigation }) => {
 
   const orderCounts = {
     pending: orders.filter((o) => normalizeOrderStatus(o) === 'pending').length,
-    waiting: orders.filter((o) => normalizeOrderStatus(o) === 'waiting').length,
-    verifying: orders.filter((o) => normalizeOrderStatus(o) === 'verifying').length,
+    to_ship: orders.filter((o) => {
+        const s = normalizeOrderStatus(o);
+        return s === 'waiting' || s === 'verifying';
+    }).length,
     shipping: orders.filter((o) => normalizeOrderStatus(o) === 'shipping').length,
-    cancelled: orders.filter((o) => normalizeOrderStatus(o) === 'cancelled').length,
     completed: orders.filter((o) => normalizeOrderStatus(o) === 'completed').length,
   };
 
@@ -123,19 +124,27 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={styles.purchaseLabel}>ที่ต้องชำระ</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.purchaseItem} activeOpacity={0.8}>
+            <TouchableOpacity 
+              style={styles.purchaseItem} 
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('OrdersList', { type: 'to_ship' })}
+            >
               <View style={styles.purchaseIconWrap}>
                 <Ionicons name="cube-outline" size={30} color="#181818" />
-                {orderCounts.waiting + orderCounts.verifying > 0 ? (
+                {orderCounts.to_ship > 0 ? (
                   <View style={styles.purchaseBadge}>
-                    <Text style={styles.purchaseBadgeText}>{orderCounts.waiting + orderCounts.verifying}</Text>
+                    <Text style={styles.purchaseBadgeText}>{orderCounts.to_ship}</Text>
                   </View>
                 ) : null}
               </View>
               <Text style={styles.purchaseLabel}>รอการจัดส่ง</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.purchaseItem} activeOpacity={0.8}>
+            <TouchableOpacity 
+              style={styles.purchaseItem} 
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('OrdersList', { type: 'to_receive' })}
+            >
               <View style={styles.purchaseIconWrap}>
                 <Ionicons name="car-outline" size={30} color="#181818" />
                 {orderCounts.shipping > 0 ? (
@@ -147,16 +156,20 @@ const ProfileScreen = ({ navigation }) => {
               <Text style={styles.purchaseLabel}>ที่ต้องได้รับ</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.purchaseItem} activeOpacity={0.8}>
+            <TouchableOpacity 
+              style={styles.purchaseItem} 
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('OrdersList', { type: 'completed' })}
+            >
               <View style={styles.purchaseIconWrap}>
-                <Ionicons name="star-outline" size={30} color="#181818" />
+                <Ionicons name="checkmark-circle-outline" size={30} color="#181818" />
                 {orderCounts.completed > 0 ? (
                   <View style={styles.purchaseBadge}>
                     <Text style={styles.purchaseBadgeText}>{orderCounts.completed}</Text>
                   </View>
                 ) : null}
               </View>
-              <Text style={styles.purchaseLabel}>ให้คะแนน</Text>
+              <Text style={styles.purchaseLabel}>จัดส่งสำเร็จ</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -176,7 +189,6 @@ const ProfileScreen = ({ navigation }) => {
             label="โค้ดส่วนลดและดีล"
             onPress={() => navigation.navigate('Coupons')}
           />
-          {/* เพิ่มปุ่ม สินค้าที่คุณสนใจ ตรงนี้ */}
           <MenuItem
             icon="heart-outline"
             label="สินค้าที่คุณสนใจ"

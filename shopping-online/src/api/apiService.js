@@ -2,7 +2,6 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_CONFIG } from '../config/appConfig';
 
-// แยก baseURL ให้เหลือแค่โฟลเดอร์ เพื่อให้การต่อ URL ในแต่ละฟังก์ชันถูกต้อง
 const BASE_URL = APP_CONFIG.API_BASE_URL;
 
 const api = axios.create({
@@ -46,6 +45,11 @@ export const apiService = {
     return response.data;
   },
 
+  addReview: async (reviewData) => {
+    const response = await api.post('api.php?action=add_review', reviewData);
+    return response.data;
+  },
+
   searchProducts: async (query) => {
     const response = await api.get(`api.php?action=search_products&q=${encodeURIComponent(query)}`);
     return response.data;
@@ -83,25 +87,14 @@ export const apiService = {
   googleLogin: (data) => {
     return fetch(`${BASE_URL}api.php?action=google_login`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
       .then(async (res) => {
         const raw = await res.text();
         let result = null;
-
-        try {
-          result = raw ? JSON.parse(raw) : null;
-        } catch {
-          throw new Error(raw || 'Google login API ส่งข้อมูลกลับมาไม่ถูกต้อง');
-        }
-
-        if (!res.ok) {
-          throw new Error(result?.message || `Google login API error (${res.status})`);
-        }
-
+        try { result = raw ? JSON.parse(raw) : null; } catch { throw new Error(raw || 'Error'); }
+        if (!res.ok) throw new Error(result?.message || `Error (${res.status})`);
         return result;
       })
       .then(async (result) => {
@@ -208,7 +201,7 @@ export const apiService = {
     return response.data;
   },
 
-  // ── Orders ───────────────────────────────────────────────
+  // ── Orders & Shipping ────────────────────────────────────
   getOrders: async (userId) => {
     const response = await api.get(`api.php?action=get_orders&user_id=${userId}`);
     return response.data;
@@ -219,10 +212,13 @@ export const apiService = {
     return response.data;
   },
 
+  trackShipment: async (barcode) => {
+    const response = await api.get(`api.php?action=track_shipment&barcode=${barcode}`);
+    return response.data;
+  },
+
   generatePaymentQr: async (amount) => {
-    const response = await api.post('api.php?action=generate_payment_qr', {
-      amount,
-    });
+    const response = await api.post('api.php?action=generate_payment_qr', { amount });
     return response.data;
   },
 
@@ -230,14 +226,12 @@ export const apiService = {
     const imageBase64 = slipAsset?.base64 || '';
     const fileName = slipAsset?.fileName || `slip_${Date.now()}.jpg`;
     const mimeType = slipAsset?.mimeType || slipAsset?.type || 'image/jpeg';
-
     const response = await api.post('api.php?action=upload_slip', {
       order_id: orderId,
       slip_base64: imageBase64,
       slip_name: fileName,
       slip_type: mimeType,
     });
-
     return response.data;
   },
 };

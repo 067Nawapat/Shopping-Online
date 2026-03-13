@@ -23,6 +23,7 @@ import WishlistScreen from '../screens/WishlistScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import PaymentPromptPayScreen from '../screens/PaymentPromptPayScreen';
 import PendingPaymentsScreen from '../screens/PendingPaymentsScreen';
+import OrdersListScreen from '../screens/OrdersListScreen';
 
 import CustomTabBar from '../components/CustomTabBar';
 import { withScreenTransition } from '../components/ScreenTransition';
@@ -51,6 +52,7 @@ const WishlistScreenAnimated = withScreenTransition(WishlistScreen);
 const CheckoutScreenAnimated = withScreenTransition(CheckoutScreen);
 const PaymentPromptPayScreenAnimated = withScreenTransition(PaymentPromptPayScreen);
 const PendingPaymentsScreenAnimated = withScreenTransition(PendingPaymentsScreen);
+const OrdersListScreenAnimated = withScreenTransition(OrdersListScreen);
 
 // Main Tab Bar Navigator
 const TabNavigator = () => (
@@ -92,6 +94,7 @@ const AppNavigator = () => {
       <Stack.Screen name="Checkout" component={CheckoutScreenAnimated} />
       <Stack.Screen name="PaymentPromptPay" component={PaymentPromptPayScreenAnimated} />
       <Stack.Screen name="PendingPayments" component={PendingPaymentsScreenAnimated} />
+      <Stack.Screen name="OrdersList" component={OrdersListScreenAnimated} />
     </Stack.Navigator>
   );
 };

@@ -8,6 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Alert,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../api/apiService';
@@ -19,6 +22,12 @@ const OrdersListScreen = ({ navigation, route }) => {
   const { type } = route.params || { type: 'to_ship' };
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Tracking Modal State
+  const [trackingModalVisible, setTrackingModalVisible] = useState(false);
+  const [trackingData, setTrackingData] = useState(null);
+  const [isFetchingTracking, setIsFetchingTracking] = useState(false);
+  const [currentTrackingNo, setCurrentTrackingNo] = useState('');
 
   const getConfig = () => {
     switch (type) {
@@ -49,10 +58,10 @@ const OrdersListScreen = ({ navigation, route }) => {
         };
       case 'completed':
         return {
-          title: 'ให้คะแนน',
+          title: 'จัดส่งสำเร็จ',
           emptyTitle: 'ไม่มีรายการที่สำเร็จ',
-          emptySub: 'รายการที่จัดส่งสำเร็จแล้วจะมาแสดงที่นี่เพื่อรับการให้คะแนน',
-          icon: 'star-outline',
+          emptySub: 'รายการที่จัดส่งสำเร็จแล้วจะมาแสดงที่นี่',
+          icon: 'checkmark-circle-outline',
           statusLabel: 'สำเร็จแล้ว',
           badgeColor: '#10B981',
           badgeBg: '#ECFDF5',
@@ -101,6 +110,63 @@ const OrdersListScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleReview = (item) => {
+    const firstItem = item.items?.[0];
+    if (firstItem) {
+        Alert.alert(
+            'เขียนรีวิวสินค้า',
+            `คุณต้องการให้คะแนน ${firstItem.name} หรือไม่?`,
+            [
+                { text: 'ยกเลิก', style: 'cancel' },
+                { text: 'เขียนรีวิว', onPress: () => console.log('Review for product:', firstItem.variant_id) }
+            ]
+        );
+    }
+  };
+
+  const handleTrackShipment = async (trackingNumber) => {
+    if (!trackingNumber) {
+      Alert.alert('แจ้งเตือน', 'ไม่พบเลขพัสดุสำหรับรายการนี้');
+      return;
+    }
+
+    setCurrentTrackingNo(trackingNumber);
+    setTrackingModalVisible(true);
+    setIsFetchingTracking(true);
+    setTrackingData(null);
+
+    try {
+      const res = await apiService.trackShipment(trackingNumber);
+      if (res && res.status && res.response && res.response.items) {
+        const items = res.response.items[trackingNumber];
+        setTrackingData(items || []);
+      } else {
+        setTrackingData([]);
+      }
+    } catch (error) {
+      console.error('Tracking error:', error);
+      setTrackingData([]);
+    } finally {
+      setIsFetchingTracking(false);
+    }
+  };
+
+  const renderTrackingItem = (item, index) => (
+    <View key={index} style={styles.trackStep}>
+      <View style={styles.trackLineContainer}>
+        <View style={[styles.trackDot, index === 0 && styles.trackDotActive]} />
+        {index !== (trackingData.length - 1) && <View style={styles.trackLine} />}
+      </View>
+      <View style={styles.trackContent}>
+        <Text style={[styles.trackStatus, index === 0 && styles.trackStatusActive]}>
+          {item.status_description}
+        </Text>
+        <Text style={styles.trackLocation}>{item.location} {item.postcode}</Text>
+        <Text style={styles.trackDate}>{item.status_date}</Text>
+      </View>
+    </View>
+  );
+
   const renderItem = ({ item }) => {
     const totalPrice = Number(item.total_price || 0);
     const orderDate = item.created_at
@@ -144,6 +210,9 @@ const OrdersListScreen = ({ navigation, route }) => {
                 : productMeta}
             </Text>
             <Text style={styles.dateText}>วันที่สั่งซื้อ: {orderDate}</Text>
+            {item.tracking_number && (
+              <Text style={styles.trackingNoText}>เลขพัสดุ: {item.tracking_number}</Text>
+            )}
           </View>
         </View>
 
@@ -154,12 +223,21 @@ const OrdersListScreen = ({ navigation, route }) => {
           </View>
           
           {type === 'completed' && (
-             <TouchableOpacity style={styles.actionButton}>
-                <Text style={styles.actionButtonText}>ให้คะแนนสินค้า</Text>
+             <TouchableOpacity style={styles.actionButton} onPress={() => handleReview(item)}>
+                <Text style={styles.actionButtonText}>เขียนรีวิวสินค้า</Text>
              </TouchableOpacity>
           )}
 
-          {(type === 'to_ship' || type === 'to_receive') && (
+          {type === 'to_receive' && (
+             <TouchableOpacity 
+                style={styles.actionButton} 
+                onPress={() => handleTrackShipment(item.tracking_number)}
+             >
+                <Text style={styles.actionButtonText}>เช็คสถานะพัสดุ</Text>
+             </TouchableOpacity>
+          )}
+
+          {type === 'to_ship' && (
              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#F0F0F0' }]}>
                 <Text style={[styles.actionButtonText, { color: BLACK }]}>ดูรายละเอียด</Text>
              </TouchableOpacity>
@@ -197,6 +275,44 @@ const OrdersListScreen = ({ navigation, route }) => {
           contentContainerStyle={styles.list}
         />
       )}
+
+      {/* Tracking Modal */}
+      <Modal
+        visible={trackingModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setTrackingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>สถานะการจัดส่ง</Text>
+              <TouchableOpacity onPress={() => setTrackingModalVisible(false)}>
+                <Ionicons name="close" size={24} color={BLACK} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.trackingInfoCard}>
+              <Text style={styles.infoLabel}>เลขพัสดุ</Text>
+              <Text style={styles.infoValue}>{currentTrackingNo}</Text>
+              <Text style={[styles.infoLabel, {marginTop: 8}]}>ผู้ขนส่ง</Text>
+              <Text style={styles.infoValue}>ไปรษณีย์ไทย (Thailand Post)</Text>
+            </View>
+
+            <ScrollView style={styles.trackingTimeline} showsVerticalScrollIndicator={false}>
+              {isFetchingTracking ? (
+                <ActivityIndicator size="large" color={BLACK} style={{ marginTop: 40 }} />
+              ) : trackingData && trackingData.length > 0 ? (
+                trackingData.map((step, index) => renderTrackingItem(step, index))
+              ) : (
+                <View style={styles.emptyTracking}>
+                  <Text style={styles.emptyTrackingText}>ไม่พบข้อมูลการจัดส่ง หรือพัสดุยังไม่เข้าสู่ระบบ</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -265,6 +381,7 @@ const styles = StyleSheet.create({
   productName: { fontSize: 14, fontWeight: '700', color: BLACK, marginBottom: 4 },
   productMeta: { fontSize: 12, color: '#666', marginBottom: 4 },
   dateText: { fontSize: 12, color: MUTED },
+  trackingNoText: { fontSize: 12, color: '#3B82F6', fontWeight: '600', marginTop: 4 },
   orderFooter: { borderTopWidth: 1, borderTopColor: '#F5F5F5', paddingTop: 15 },
   totalContainer: {
     flexDirection: 'row',
@@ -290,6 +407,48 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: BLACK, marginTop: 15 },
   emptySub: { fontSize: 14, color: MUTED, marginTop: 5, textAlign: 'center', paddingHorizontal: 40 },
+  
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '80%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: BLACK },
+  trackingInfoCard: {
+    backgroundColor: '#F8F9FA',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  infoLabel: { fontSize: 12, color: MUTED, marginBottom: 2 },
+  infoValue: { fontSize: 15, fontWeight: '700', color: BLACK },
+  trackingTimeline: { flex: 1 },
+  trackStep: { flexDirection: 'row', marginBottom: 0 },
+  trackLineContainer: { alignItems: 'center', width: 30 },
+  trackDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#DDD', zIndex: 1 },
+  trackDotActive: { backgroundColor: '#3B82F6', width: 12, height: 12, borderRadius: 6 },
+  trackLine: { width: 2, flex: 1, backgroundColor: '#EEE', marginVertical: -2 },
+  trackContent: { flex: 1, paddingLeft: 10, paddingBottom: 25 },
+  trackStatus: { fontSize: 14, fontWeight: '600', color: MUTED, marginBottom: 4 },
+  trackStatusActive: { color: BLACK, fontSize: 15, fontWeight: '700' },
+  trackLocation: { fontSize: 13, color: '#666', marginBottom: 2 },
+  trackDate: { fontSize: 12, color: MUTED },
+  emptyTracking: { alignItems: 'center', marginTop: 50 },
+  emptyTrackingText: { color: MUTED, textAlign: 'center' },
 });
 
 export default OrdersListScreen;
