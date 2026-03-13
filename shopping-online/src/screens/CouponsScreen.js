@@ -161,10 +161,15 @@ const CouponsScreen = ({ navigation }) => {
     [myCoupons]
   );
 
+  const availableMyCoupons = useMemo(
+    () => myCoupons.filter((item) => Number(item.used) !== 1),
+    [myCoupons]
+  );
+
   const filteredCoupons = useMemo(() => {
     const source = activeTab === TAB_COLLECT
       ? coupons.filter((item) => Number(item.quantity ?? 0) > 0 || claimedCouponIds.has(Number(item.id)))
-      : myCoupons;
+      : availableMyCoupons;
     const keyword = searchText.trim().toLowerCase();
 
     if (!keyword) {
@@ -176,7 +181,7 @@ const CouponsScreen = ({ navigation }) => {
       const discount = String(item.discount || '').toLowerCase();
       return code.includes(keyword) || discount.includes(keyword);
     });
-  }, [activeTab, claimedCouponIds, coupons, myCoupons, searchText]);
+  }, [activeTab, availableMyCoupons, claimedCouponIds, coupons, searchText]);
 
   const handleClaimCoupon = async (coupon) => {
     if (!user?.id || !coupon?.id || claimingCouponId || Number(coupon.quantity || 0) <= 0) {

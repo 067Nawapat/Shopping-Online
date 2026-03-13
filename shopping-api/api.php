@@ -881,6 +881,7 @@ case 'create_order':
     $data = read_body();
     $userId = (int)($data['user_id'] ?? 0);
     $total = (float)($data['total_price'] ?? 0);
+    $couponId = (int)($data['coupon_id'] ?? 0);
     $paymentMethod = payment_method_label($data['payment_method'] ?? 'promptpay');
     $items = is_array($data['items'] ?? null) ? $data['items'] : [];
 
@@ -916,6 +917,20 @@ case 'create_order':
 
             $itemStmt->bind_param("iiid", $orderId, $variantId, $quantity, $price);
             $itemStmt->execute();
+        }
+
+        if ($couponId > 0) {
+            $couponStmt = $conn->prepare("UPDATE user_coupons SET used = 1 WHERE user_id = ? AND coupon_id = ? AND used = 0");
+            if (!$couponStmt) {
+                throw new Exception($conn->error);
+            }
+
+            $couponStmt->bind_param("ii", $userId, $couponId);
+            $couponStmt->execute();
+
+            if ($couponStmt->affected_rows === 0) {
+                throw new Exception('Coupon is invalid or already used');
+            }
         }
 
         $conn->commit();

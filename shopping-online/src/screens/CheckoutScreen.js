@@ -88,7 +88,10 @@ const CheckoutScreen = ({ route, navigation }) => {
       setSelectedAddress(defaultAddr);
 
       const couponData = await apiService.getUserCoupons(userData.id);
-      setCoupons(couponData || []);
+      const availableCoupons = Array.isArray(couponData)
+        ? couponData.filter((item) => Number(item.used) !== 1)
+        : [];
+      setCoupons(availableCoupons);
     } catch (error) {
       console.error('Checkout load error:', error);
     } finally {
