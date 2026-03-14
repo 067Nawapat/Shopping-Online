@@ -11,7 +11,8 @@ function product_select_sql() {
             COALESCE(
                 (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id),
                 0
-            ) AS price
+            ) AS price,
+            COALESCE(p.sold, 0) as sold
         FROM products p
     ";
 }
@@ -35,11 +36,11 @@ switch ($action) {
         break;
 
     case 'search_products':
-        $q = $_GET['q'] ?? '';
+        $q = trim($_GET['q'] ?? '');
         $searchTerm = "%$q%";
         $productSelect = product_select_sql();
-        $stmt = $conn->prepare($productSelect . " WHERE p.name LIKE ? OR p.brand LIKE ? ORDER BY p.id DESC");
-        $stmt->bind_param("ss", $searchTerm, $searchTerm);
+        $stmt = $conn->prepare($productSelect . " WHERE (p.name LIKE ? OR p.brand LIKE ? OR p.description LIKE ?) ORDER BY p.id DESC");
+        $stmt->bind_param("sss", $searchTerm, $searchTerm, $searchTerm);
         $stmt->execute();
         json_response($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
         break;
@@ -82,47 +83,35 @@ switch ($action) {
         $data = read_body();
         $productId = (int)($data['product_id'] ?? 0);
         $userId = (int)($data['user_id'] ?? 0);
+        $orderId = (int)($data['order_id'] ?? 0); // รับ order_id เพิ่มเข้ามา
         $rating = (int)($data['rating'] ?? 0);
         $comment = $data['comment'] ?? '';
         $photos = $data['photos'] ?? [];
 
-        if (!$productId || !$userId || !$rating) {
-            json_response(["status" => "error", "message" => "Incomplete data"], 400);
+        if (!$productId || !$userId || !$rating || !$orderId) {
+            json_response(["status" => "error", "message" => "ข้อมูลไม่ครบถ้วน"], 400);
         }
 
-        // ── Check Review Eligibility ──
-        // 1. Count how many times this user has bought this product in 'completed' orders
-        $stmtBuy = $conn->prepare("
-            SELECT SUM(oi.quantity) as total_bought 
-            FROM order_items oi 
-            JOIN product_variants pv ON oi.variant_id = pv.id 
-            JOIN orders o ON oi.order_id = o.id 
-            WHERE pv.product_id = ? AND o.user_id = ? AND o.status = 'completed'
-        ");
-        $stmtBuy->bind_param("ii", $productId, $userId);
-        $stmtBuy->execute();
-        $resBuy = $stmtBuy->get_result()->fetch_assoc();
-        $totalBought = (int)($resBuy['total_bought'] ?? 0);
-
-        if ($totalBought === 0) {
-            json_response(["status" => "error", "message" => "คุณต้องซื้อสินค้านี้และได้รับสินค้าเรียบร้อยแล้วจึงจะรีวิวได้"], 403);
+        // 1. เช็กว่า Order นี้มีอยู่จริงและเป็นของผู้ใช้คนนี้ และจัดส่งสำเร็จแล้ว
+        $stmtCheck = $conn->prepare("SELECT id FROM orders WHERE id = ? AND user_id = ? AND status = 'completed'");
+        $stmtCheck->bind_param("ii", $orderId, $userId);
+        $stmtCheck->execute();
+        if ($stmtCheck->get_result()->num_rows === 0) {
+            json_response(["status" => "error", "message" => "ไม่พบรายการสั่งซื้อที่สำเร็จ"], 403);
         }
 
-        // 2. Count how many reviews the user has already written for this product
-        $stmtReview = $conn->prepare("SELECT COUNT(*) as review_count FROM reviews WHERE product_id = ? AND user_id = ?");
-        $stmtReview->bind_param("ii", $productId, $userId);
-        $stmtReview->execute();
-        $resReview = $stmtReview->get_result()->fetch_assoc();
-        $reviewCount = (int)($resReview['review_count'] ?? 0);
-
-        if ($reviewCount >= $totalBought) {
-            json_response(["status" => "error", "message" => "คุณได้รีวิวสินค้านี้ตามจำนวนครั้งที่ซื้อเรียบร้อยแล้ว"], 403);
+        // 2. เช็กว่า Order นี้เคยรีวิวสินค้าตัวนี้ไปแล้วหรือยัง
+        $stmtDup = $conn->prepare("SELECT id FROM reviews WHERE order_id = ? AND product_id = ?");
+        $stmtDup->bind_param("ii", $orderId, $productId);
+        $stmtDup->execute();
+        if ($stmtDup->get_result()->num_rows > 0) {
+            json_response(["status" => "error", "message" => "คุณได้รีวิวรายการสั่งซื้อนี้ไปแล้ว"], 403);
         }
 
         $conn->begin_transaction();
         try {
-            $stmt = $conn->prepare("INSERT INTO reviews(product_id, user_id, rating, comment) VALUES(?,?,?,?)");
-            $stmt->bind_param("iiis", $productId, $userId, $rating, $comment);
+            $stmt = $conn->prepare("INSERT INTO reviews(product_id, user_id, order_id, rating, comment) VALUES(?,?,?,?,?)");
+            $stmt->bind_param("iiiis", $productId, $userId, $orderId, $rating, $comment);
             $stmt->execute();
             $reviewId = $stmt->insert_id;
 

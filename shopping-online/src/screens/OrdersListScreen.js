@@ -34,6 +34,7 @@ const OrdersListScreen = ({ navigation, route }) => {
   // Review Modal State
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null); // เพิ่มการเก็บ order_id
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [images, setImages] = useState([]);
@@ -123,12 +124,13 @@ const OrdersListScreen = ({ navigation, route }) => {
     }
   };
 
-  const openReviewModal = (productInfo) => {
+  const openReviewModal = (item, productInfo) => {
     if (productInfo.is_reviewed) {
       setModalConfig({ title: 'แจ้งเตือน', message: 'คุณได้รีวิวสินค้านี้ไปเรียบร้อยแล้ว' });
       return;
     }
 
+    setSelectedOrder(item); // เก็บข้อมูล Order ทั้งก้อน
     setSelectedProduct({
       id: productInfo.product_id,
       name: productInfo.name,
@@ -187,6 +189,7 @@ const OrdersListScreen = ({ navigation, route }) => {
       const payload = {
         product_id: selectedProduct.id,
         user_id: user.id,
+        order_id: selectedOrder.id, // ส่ง order_id ไปยัง API
         rating: rating,
         comment: comment,
         photos: images.map(img => img.base64),
@@ -196,7 +199,7 @@ const OrdersListScreen = ({ navigation, route }) => {
       if (res && res.status === 'success') {
         setReviewModalVisible(false);
         setModalConfig({ title: 'สำเร็จ', message: 'ขอบคุณสำหรับการรีวิวของคุณ' });
-        fetchData(); // Refresh list to update review status
+        fetchData(); // รีเฟรชข้อมูลเพื่ออัปเดตสถานะปุ่ม
       } else {
         setModalConfig({ title: 'ไม่สำเร็จ', message: res?.message || 'ไม่สามารถบันทึกรีวิวได้' });
       }
@@ -309,7 +312,7 @@ const OrdersListScreen = ({ navigation, route }) => {
           {type === 'completed' && (
              <TouchableOpacity 
                 style={[styles.actionButton, firstItem?.is_reviewed && styles.disabledBtn]} 
-                onPress={() => openReviewModal(firstItem)}
+                onPress={() => openReviewModal(item, firstItem)}
              >
                 <Text style={styles.actionButtonText}>
                   {firstItem?.is_reviewed ? 'รีวิวแล้ว' : 'เขียนรีวิวสินค้า'}
@@ -381,7 +384,7 @@ const OrdersListScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             </View>
             
-            <View style={styles.trackingInfoCard}>
+            <View style={trackingInfoCardStyle}>
               <Text style={styles.infoLabel}>เลขพัสดุ</Text>
               <Text style={styles.infoValue}>{currentTrackingNo}</Text>
               <Text style={[styles.infoLabel, {marginTop: 8}]}>ผู้ขนส่ง</Text>
@@ -515,6 +518,13 @@ const emptyTitleStyle = {
     marginTop: 15,
 };
 
+const trackingInfoCardStyle = {
+    backgroundColor: '#F8F9FA',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+};
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F8F8' },
   header: {
@@ -629,12 +639,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: { fontSize: 18, fontWeight: '800', color: BLACK },
-  trackingInfoCard: {
-    backgroundColor: '#F8F9FA',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
   infoLabel: { fontSize: 12, color: MUTED, marginBottom: 2 },
   infoValue: { fontSize: 15, fontWeight: '700', color: BLACK },
   trackingTimeline: { flex: 1 },

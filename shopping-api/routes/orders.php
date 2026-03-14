@@ -25,10 +25,8 @@ switch ($action) {
                 s.tracking_number,
                 s.carrier,
                 s.status_description as shipment_status,
-                -- เพิ่มการเช็กว่าสินค้าใน Order นี้ถูกรีวิวไปแล้วหรือยัง (เช็กจาก product_id และ user_id)
-                (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id AND r.user_id = o.user_id) as total_product_reviews,
-                -- นับจำนวนที่เคยซื้อสินค้านี้ทั้งหมดที่สำเร็จแล้ว
-                (SELECT SUM(oi2.quantity) FROM order_items oi2 JOIN orders o2 ON oi2.order_id = o2.id WHERE o2.user_id = o.user_id AND o2.status = 'completed' AND oi2.variant_id IN (SELECT id FROM product_variants WHERE product_id = p.id)) as total_bought
+                -- แก้ไข: เช็กว่ารายการใน Order ID นี้ถูกรีวิวไปแล้วหรือยัง
+                (SELECT COUNT(*) FROM reviews r WHERE r.order_id = o.id AND r.product_id = p.id) as is_item_reviewed
             FROM orders o
             LEFT JOIN order_items oi ON o.id = oi.order_id
             LEFT JOIN product_variants pv ON oi.variant_id = pv.id
@@ -65,8 +63,8 @@ switch ($action) {
             }
 
             if (!empty($row['variant_id'])) {
-                // คำนวณสิทธิ์การรีวิว: รีวิวไปแล้ว < จำนวนที่ซื้อทั้งหมด
-                $canReview = (int)$row['total_product_reviews'] < (int)$row['total_bought'];
+                // ถ้าใน Order นี้มีประวัติการรีวิวสินค้านี้แล้ว is_reviewed จะเป็น true
+                $isReviewed = (int)$row['is_item_reviewed'] > 0;
                 
                 $orders[$orderId]['items'][] = [
                     'variant_id' => $row['variant_id'],
@@ -77,8 +75,8 @@ switch ($action) {
                     'size'       => $row['size'],
                     'price'      => $row['item_price'],
                     'quantity'   => $row['quantity'],
-                    'can_review' => $canReview,
-                    'is_reviewed' => !$canReview
+                    'is_reviewed' => $isReviewed,
+                    'can_review' => !$isReviewed
                 ];
             }
         }
