@@ -234,4 +234,20 @@ export const apiService = {
     });
     return response.data;
   },
+
+  // ── Notifications ────────────────────────────────────────
+  getNotifications: async (userId) => {
+    const response = await api.get(`api.php?action=get_notifications&user_id=${userId}`);
+    return response.data;
+  },
+
+  savePushToken: async (userId, token) => {
+    const response = await api.post('api.php?action=save_push_token', { user_id: userId, push_token: token });
+    return response.data;
+  },
+
+  adminSendNotification: async (notiData) => {
+    const response = await api.post('api.php?action=admin_send_notification', notiData);
+    return response.data;
+  },
 };

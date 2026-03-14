@@ -47,6 +47,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <a class="nav-link <?= $current_page == 'categories.php' ? 'active' : '' ?>" href="categories.php">
             <i class="bi bi-tags me-2"></i> หมวดหมู่
         </a>
+        <a class="nav-link <?= $current_page == 'notifications.php' ? 'active' : '' ?>" href="notifications.php">
+            <i class="bi bi-megaphone-fill me-2"></i> แจ้งเตือน Push
+        </a>
         <a class="nav-link <?= $current_page == 'banners.php' ? 'active' : '' ?>" href="banners.php">
             <i class="bi bi-image me-2"></i> แบนเนอร์
         </a>

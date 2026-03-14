@@ -18,6 +18,7 @@ import { apiService } from '../api/apiService';
 import ConfirmModal from '../components/ConfirmModal';
 import ProductCard from '../components/ProductCard';
 import styles from '../styles/ProductDetailScreen.styles';
+import { BLACK, MUTED } from '../utils/constants';
 
 const formatPrice = (value) => `฿ ${Math.round(Number(value) || 0).toLocaleString()}`;
 const formatCompactPrice = (value) => `฿${Math.round(Number(value) || 0).toLocaleString()}`;
@@ -52,6 +53,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const [reviewExpanded, setReviewExpanded] = useState(true);
   const [detailExpanded, setDetailExpanded] = useState(true);
   const [modalConfig, setModalConfig] = useState(null);
+
+  // Review Modal State
+  const [allReviewsVisible, setAllReviewsVisible] = useState(false);
+  const [ratingFilter, setRatingFilter] = useState(0); // 0 = All
 
   const panY = useRef(new Animated.Value(0)).current;
   const panResponder = useRef(
@@ -178,8 +183,19 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const filteredVariants = useMemo(() => selectedColor ? variants.filter(i => i.color === selectedColor) : variants, [selectedColor, variants]);
   
   const reviews = product?.reviews || [];
-  const ratingValue = Number(product?.avg_rating || 0);
-  const totalReviews = Number(product?.total_reviews || reviews.length || 0);
+  
+  const totalReviews = useMemo(() => reviews.length, [reviews]);
+  
+  const ratingValue = useMemo(() => {
+    if (reviews.length === 0) return 0;
+    const sum = reviews.reduce((acc, r) => acc + Number(r.rating || 0), 0);
+    return sum / reviews.length;
+  }, [reviews]);
+
+  const filteredReviews = useMemo(() => {
+    if (ratingFilter === 0) return reviews;
+    return reviews.filter(r => Math.round(Number(r.rating)) === ratingFilter);
+  }, [reviews, ratingFilter]);
 
   const ratingDistribution = useMemo(() => {
     const counts = [0, 0, 0, 0, 0, 0];
@@ -203,11 +219,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
         <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={30} color="#111" />
         </TouchableOpacity>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconButton}><Ionicons name="search-outline" size={30} color="#111" /></TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}><Ionicons name="share-social-outline" size={29} color="#111" /></TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}><Ionicons name="notifications-outline" size={28} color="#111" /></TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.iconButton} onPress={() => navigation.navigate('MainTabs', { screen: 'ค้นหา' })}>
+          <Ionicons name="search" size={28} color="#111" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -231,7 +245,9 @@ const ProductDetailScreen = ({ route, navigation }) => {
           <View style={styles.ratingRow}>
             <View style={styles.starsRow}>{[1, 2, 3, 4, 5].map(s => <Ionicons key={s} name={s <= Math.round(ratingValue) ? 'star' : 'star-outline'} size={18} color="#F4C534" />)}</View>
             <Text style={styles.ratingValue}>{ratingValue.toFixed(1)}</Text>
-            <Text style={styles.reviewLink}>({totalReviews} รีวิว)</Text>
+            <TouchableOpacity onPress={() => setAllReviewsVisible(true)}>
+              <Text style={styles.reviewLink}>({totalReviews} รีวิว)</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.priceStatsRow}>
             <View style={styles.priceStatBox}><Text style={styles.statLabel}>เริ่มต้นที่</Text><Text style={styles.statValue}>{formatPrice(product.price)}</Text></View>
@@ -299,8 +315,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   </View>
                 </View>
               ))}
-              {reviews.length > 3 && (
-                <TouchableOpacity style={styles.moreReviewButton}><Text style={styles.moreReviewButtonText}>ดูรีวิวเพิ่มเติม</Text></TouchableOpacity>
+              {reviews.length > 0 && (
+                <TouchableOpacity style={styles.moreReviewButton} onPress={() => setAllReviewsVisible(true)}>
+                  <Text style={styles.moreReviewButtonText}>ดูรีวิวทั้งหมด</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -323,7 +341,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         {relatedProducts.length > 0 && (
           <View style={styles.relatedSection}>
             <Text style={styles.relatedTitle}>สินค้าที่คุณอาจสนใจ</Text>
-            <View style={styles.relatedGrid}>
+            <View style={relatedGridStyle}>
               {relatedProducts.map((item) => (
                 <ProductCard key={item.id} product={item} isWishlisted={wishlistIds.includes(item.id)} onWishlistPress={toggleWishlist} onPress={() => navigation.push('ProductDetail', { productId: item.id })} />
               ))}
@@ -340,6 +358,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         <TouchableOpacity style={styles.buyButton} onPress={() => handleAction('buy')}><Text style={styles.buyButtonText}>ซื้อ</Text></TouchableOpacity>
       </View>
 
+      {/* ── Size/Buy Modal ── */}
       <Modal visible={sizeModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <Animated.View style={[styles.sizeModalContent, { transform: [{ translateY: panY }] }]} {...panResponder.panHandlers}>
@@ -378,7 +397,93 @@ const ProductDetailScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      <ConfirmModal visible={!!modalConfig} title={modalConfig?.title} message={modalConfig?.message} confirmText="ตกลง" hideCancel onConfirm={() => setModalConfig(null)} />
+      {/* ── All Reviews Modal ── */}
+      <Modal
+        visible={allReviewsVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAllReviewsVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.sizeModalContent, { height: '90%' }]}>
+            <View style={reviewModalHeaderStyle}>
+              <Text style={reviewModalTitleStyle}>รีวิวทั้งหมด ({totalReviews})</Text>
+              <TouchableOpacity onPress={() => setAllReviewsVisible(false)}>
+                <Ionicons name="close" size={28} color="#111" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Rating Filter Tabs */}
+            <View style={{ height: 50, marginBottom: 10 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                {[0, 5, 4, 3, 2, 1].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    style={[
+                      filterTabStyle,
+                      ratingFilter === star && filterTabActiveStyle
+                    ]}
+                    onPress={() => setRatingFilter(star)}
+                  >
+                    <Text style={[
+                      filterTabTextStyle,
+                      ratingFilter === star && filterTabActiveStyle
+                    ]}>
+                      {star === 0 ? 'ทั้งหมด' : `${star} ดาว`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <FlatList
+              data={filteredReviews}
+              keyExtractor={(item, index) => index.toString()}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+              ListEmptyComponent={
+                <View style={{ alignItems: 'center', marginTop: 50 }}>
+                  <Text style={{ color: MUTED }}>ยังไม่มีรีวิวสำหรับคะแนนนี้</Text>
+                </View>
+              }
+              renderItem={({ item }) => (
+                <View style={reviewItemStyle}>
+                  <View style={styles.reviewTop}>
+                    <View style={styles.starsRow}>
+                      {[1, 2, 3, 4, 5].map(s => (
+                        <Ionicons 
+                          key={s} 
+                          name={s <= item.rating ? "star" : "star-outline"} 
+                          size={14} 
+                          color="#F4C534" 
+                        />
+                      ))}
+                    </View>
+                    <Text style={styles.reviewDate}>{formatReviewDate(item.created_at)}</Text>
+                  </View>
+                  <Text style={styles.reviewUser}>{item.user_name || "ผู้ใช้"}</Text>
+                  <Text style={styles.reviewComment}>{item.comment}</Text>
+                  {item.photos && item.photos.length > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+                      {item.photos.map((p, i) => (
+                        <Image key={i} source={{ uri: p }} style={reviewImageStyle} />
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <ConfirmModal 
+        visible={!!modalConfig} 
+        title={modalConfig?.title} 
+        message={modalConfig?.message} 
+        confirmText="ตกลง" 
+        hideCancel 
+        onConfirm={() => setModalConfig(null)} 
+      />
     </SafeAreaView>
   );
 };
@@ -386,6 +491,67 @@ const ProductDetailScreen = ({ route, navigation }) => {
 const sectionInnerStyle = {
     padding: 20,
     backgroundColor: '#fff',
+};
+
+const relatedGridStyle = {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+};
+
+const reviewModalHeaderStyle = {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+};
+
+const reviewModalTitleStyle = {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111',
+};
+
+const filterTabStyle = {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#EEE',
+};
+
+const filterTabActiveStyle = {
+    backgroundColor: BLACK,
+    borderColor: BLACK,
+};
+
+const filterTabTextStyle = {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+};
+
+const filterTabTextActiveStyle = {
+    color: '#FFF',
+};
+
+const reviewItemStyle = {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+};
+
+const reviewImageStyle = {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    marginRight: 8,
+    backgroundColor: '#F9F9F9',
 };
 
 export default ProductDetailScreen;

@@ -89,11 +89,19 @@ switch ($action) {
             }
 
             $userId = $stmt->insert_id;
-            $stmt   = $conn->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
-            $stmt->bind_param("i", $userId);
-            $stmt->execute();
-            $user = $stmt->get_result()->fetch_assoc();
+        } else {
+            // ถ้ามี user อยู่แล้ว ให้อัปเดต avatar และชื่อล่าสุดจาก Google
+            $userId = $user['id'];
+            $updateStmt = $conn->prepare("UPDATE users SET name=?, avatar=? WHERE id=?");
+            $updateStmt->bind_param("ssi", $name, $avatar, $userId);
+            $updateStmt->execute();
         }
+
+        // ดึงข้อมูลผู้ใช้ล่าสุดส่งกลับไป
+        $stmt = $conn->prepare("SELECT * FROM users WHERE id = ? LIMIT 1");
+        $stmt->bind_param("i", $userId);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
 
         if (!$user) {
             json_response(["status" => "error", "message" => "Google login failed"], 500);

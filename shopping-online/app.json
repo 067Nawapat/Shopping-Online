@@ -28,7 +28,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin"
-    ]
+      "@react-native-google-signin/google-signin",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7bcaf552-1160-4df2-a1de-e2c0a954868a"
+      }
+    },
+    "owner": "justtttlll"
   }
 }

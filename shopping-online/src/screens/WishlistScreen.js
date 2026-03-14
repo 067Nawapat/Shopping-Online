@@ -106,7 +106,7 @@ const WishlistScreen = ({ navigation }) => {
             <View style={styles.emptyWrap}>
               <Ionicons name="heart-outline" size={64} color="#DDD" />
               <Text style={styles.emptyText}>คุณยังไม่มีสินค้าที่สนใจ</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.shopBtn}
                 onPress={() => navigation.navigate('หน้าหลัก')}
               >

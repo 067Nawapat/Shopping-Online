@@ -8,15 +8,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  Alert,
   Modal,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../api/apiService';
 import { BLACK, MUTED } from '../utils/constants';
 import { SPACING, SHADOW } from '../styles/theme';
 import { extractOrders, normalizeOrderStatus } from '../utils/orderUtils';
+import ConfirmModal from '../components/ConfirmModal';
 
 const OrdersListScreen = ({ navigation, route }) => {
   const { type } = route.params || { type: 'to_ship' };
@@ -28,6 +30,17 @@ const OrdersListScreen = ({ navigation, route }) => {
   const [trackingData, setTrackingData] = useState(null);
   const [isFetchingTracking, setIsFetchingTracking] = useState(false);
   const [currentTrackingNo, setCurrentTrackingNo] = useState('');
+
+  // Review Modal State
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [images, setImages] = useState([]);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Alert Modal State
+  const [modalConfig, setModalConfig] = useState(null);
 
   const getConfig = () => {
     switch (type) {
@@ -110,23 +123,94 @@ const OrdersListScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleReview = (item) => {
-    const firstItem = item.items?.[0];
-    if (firstItem) {
-        Alert.alert(
-            'เขียนรีวิวสินค้า',
-            `คุณต้องการให้คะแนน ${firstItem.name} หรือไม่?`,
-            [
-                { text: 'ยกเลิก', style: 'cancel' },
-                { text: 'เขียนรีวิว', onPress: () => console.log('Review for product:', firstItem.variant_id) }
-            ]
-        );
+  const openReviewModal = (productInfo) => {
+    if (productInfo.is_reviewed) {
+      setModalConfig({ title: 'แจ้งเตือน', message: 'คุณได้รีวิวสินค้านี้ไปเรียบร้อยแล้ว' });
+      return;
+    }
+
+    setSelectedProduct({
+      id: productInfo.product_id,
+      name: productInfo.name,
+      image: productInfo.image,
+    });
+    setRating(5);
+    setComment('');
+    setImages([]);
+    setReviewModalVisible(true);
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      setModalConfig({ title: 'ขออภัย', message: 'เราต้องการสิทธิ์ในการเข้าถึงรูปภาพของคุณ' });
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+      base64: true,
+    });
+
+    if (!result.canceled) {
+      const selectedImages = result.assets.map(asset => ({
+        uri: asset.uri,
+        base64: asset.base64,
+        name: asset.fileName || `review_${Date.now()}.jpg`,
+      }));
+      setImages([...images, ...selectedImages].slice(0, 5)); // Limit to 5 images
+    }
+  };
+
+  const removeImage = (index) => {
+    const newImages = [...images];
+    newImages.splice(index, 1);
+    setImages(newImages);
+  };
+
+  const handleSubmitReview = async () => {
+    if (rating === 0) {
+      setModalConfig({ title: 'แจ้งเตือน', message: 'กรุณาให้คะแนนสินค้า' });
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      const user = await apiService.getUser();
+      if (!user) {
+        setModalConfig({ title: 'แจ้งเตือน', message: 'กรุณาเข้าสู่ระบบก่อนเขียนรีวิว' });
+        return;
+      }
+
+      const payload = {
+        product_id: selectedProduct.id,
+        user_id: user.id,
+        rating: rating,
+        comment: comment,
+        photos: images.map(img => img.base64),
+      };
+
+      const res = await apiService.addReview(payload);
+      if (res && res.status === 'success') {
+        setReviewModalVisible(false);
+        setModalConfig({ title: 'สำเร็จ', message: 'ขอบคุณสำหรับการรีวิวของคุณ' });
+        fetchData(); // Refresh list to update review status
+      } else {
+        setModalConfig({ title: 'ไม่สำเร็จ', message: res?.message || 'ไม่สามารถบันทึกรีวิวได้' });
+      }
+    } catch (error) {
+      console.error('Submit review error:', error);
+      setModalConfig({ title: 'ไม่สำเร็จ', message: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง' });
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
   const handleTrackShipment = async (trackingNumber) => {
     if (!trackingNumber) {
-      Alert.alert('แจ้งเตือน', 'ไม่พบเลขพัสดุสำหรับรายการนี้');
+      setModalConfig({ title: 'แจ้งเตือน', message: 'ไม่พบเลขพัสดุสำหรับรายการนี้' });
       return;
     }
 
@@ -223,8 +307,13 @@ const OrdersListScreen = ({ navigation, route }) => {
           </View>
           
           {type === 'completed' && (
-             <TouchableOpacity style={styles.actionButton} onPress={() => handleReview(item)}>
-                <Text style={styles.actionButtonText}>เขียนรีวิวสินค้า</Text>
+             <TouchableOpacity 
+                style={[styles.actionButton, firstItem?.is_reviewed && styles.disabledBtn]} 
+                onPress={() => openReviewModal(firstItem)}
+             >
+                <Text style={styles.actionButtonText}>
+                  {firstItem?.is_reviewed ? 'รีวิวแล้ว' : 'เขียนรีวิวสินค้า'}
+                </Text>
              </TouchableOpacity>
           )}
 
@@ -264,7 +353,7 @@ const OrdersListScreen = ({ navigation, route }) => {
       ) : orders.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name={config.icon} size={64} color="#DDD" />
-          <Text style={styles.emptyTitle}>{config.emptyTitle}</Text>
+          <Text style={emptyTitleStyle}>{config.emptyTitle}</Text>
           <Text style={styles.emptySub}>{config.emptySub}</Text>
         </View>
       ) : (
@@ -313,8 +402,117 @@ const OrdersListScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Review Modal */}
+      <Modal
+        visible={reviewModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setReviewModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>เขียนรีวิวสินค้า</Text>
+              <TouchableOpacity onPress={() => setReviewModalVisible(false)}>
+                <Ionicons name="close" size={24} color={BLACK} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {selectedProduct && (
+                <View style={styles.reviewProductInfo}>
+                  <Image source={{ uri: selectedProduct.image }} style={styles.reviewProductImg} />
+                  <Text style={styles.reviewProductName}>{selectedProduct.name}</Text>
+                </View>
+              )}
+
+              <View style={styles.ratingSection}>
+                <Text style={styles.sectionLabel}>ให้คะแนนความพึงพอใจ</Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <TouchableOpacity key={s} onPress={() => setRating(s)}>
+                      <Ionicons
+                        name={s <= rating ? "star" : "star-outline"}
+                        size={36}
+                        color={s <= rating ? "#F59E0B" : "#DDD"}
+                        style={{ marginHorizontal: 5 }}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.commentSection}>
+                <Text style={styles.sectionLabel}>บอกความรู้สึกของคุณ</Text>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="สินค้าเป็นอย่างไรบ้าง? เขียนรีวิวที่นี่..."
+                  multiline
+                  numberOfLines={4}
+                  value={comment}
+                  onChangeText={setComment}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.imageSection}>
+                <Text style={styles.sectionLabel}>เพิ่มรูปภาพ (สูงสุด 5 รูป)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
+                  {images.map((img, index) => (
+                    <View key={index} style={styles.imagePreviewContainer}>
+                      <Image source={{ uri: img.uri }} style={styles.imagePreview} />
+                      <TouchableOpacity 
+                        style={styles.removeImageBtn} 
+                        onPress={() => removeImage(index)}
+                      >
+                        <Ionicons name="close-circle" size={20} color="red" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {images.length < 5 && (
+                    <TouchableOpacity style={styles.addImageBtn} onPress={pickImage}>
+                      <Ionicons name="camera-outline" size={30} color={MUTED} />
+                      <Text style={styles.addImageText}>เพิ่มรูป</Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.submitBtn, submittingReview && { opacity: 0.7 }]} 
+                onPress={handleSubmitReview}
+                disabled={submittingReview}
+              >
+                {submittingReview ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.submitBtnText}>ส่งรีวิว</Text>
+                )}
+              </TouchableOpacity>
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <ConfirmModal 
+        visible={!!modalConfig} 
+        title={modalConfig?.title} 
+        message={modalConfig?.message} 
+        confirmText="ตกลง" 
+        hideCancel 
+        onConfirm={() => setModalConfig(null)} 
+      />
     </SafeAreaView>
   );
+};
+
+const emptyTitleStyle = {
+    fontSize: 18,
+    fontWeight: '700',
+    color: BLACK,
+    marginTop: 15,
 };
 
 const styles = StyleSheet.create({
@@ -398,6 +596,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  disabledBtn: {
+    backgroundColor: '#DDD',
+  },
   actionButtonText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
   emptyContainer: {
     flex: 1,
@@ -449,6 +650,57 @@ const styles = StyleSheet.create({
   trackDate: { fontSize: 12, color: MUTED },
   emptyTracking: { alignItems: 'center', marginTop: 50 },
   emptyTrackingText: { color: MUTED, textAlign: 'center' },
+
+  // Review Modal Styles
+  reviewProductInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 25,
+    padding: 10,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 10,
+  },
+  reviewProductImg: { width: 50, height: 50, borderRadius: 8, marginRight: 15 },
+  reviewProductName: { fontSize: 14, fontWeight: '700', color: BLACK, flex: 1 },
+  sectionLabel: { fontSize: 15, fontWeight: '700', color: BLACK, marginBottom: 12 },
+  ratingSection: { alignItems: 'center', marginBottom: 25 },
+  starsContainer: { flexDirection: 'row' },
+  commentSection: { marginBottom: 25 },
+  commentInput: {
+    backgroundColor: '#F9F9F9',
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 14,
+    color: BLACK,
+    borderWidth: 1,
+    borderColor: '#EEE',
+    minHeight: 100,
+  },
+  imageSection: { marginBottom: 30 },
+  imagesScroll: { flexDirection: 'row' },
+  imagePreviewContainer: { marginRight: 10, position: 'relative' },
+  imagePreview: { width: 80, height: 80, borderRadius: 10 },
+  removeImageBtn: { position: 'absolute', top: -5, right: -5, backgroundColor: '#FFF', borderRadius: 10 },
+  addImageBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+  },
+  addImageText: { fontSize: 12, color: MUTED, marginTop: 4 },
+  submitBtn: {
+    backgroundColor: BLACK,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  submitBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
 });
 
 export default OrdersListScreen;

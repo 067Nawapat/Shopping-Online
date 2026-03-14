@@ -34,6 +34,16 @@ export default StyleSheet.create({
   iconButton: {
     padding: 2,
   },
+  profileBtn: {
+    padding: 2,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EEE',
+  },
   heroSection: {
     paddingHorizontal: 12,
     paddingTop: 10,

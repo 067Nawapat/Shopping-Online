@@ -24,7 +24,11 @@ switch ($action) {
                 COALESCE(size_attr.attribute_value, '-') AS size,
                 s.tracking_number,
                 s.carrier,
-                s.status_description as shipment_status
+                s.status_description as shipment_status,
+                -- เพิ่มการเช็กว่าสินค้าใน Order นี้ถูกรีวิวไปแล้วหรือยัง (เช็กจาก product_id และ user_id)
+                (SELECT COUNT(*) FROM reviews r WHERE r.product_id = p.id AND r.user_id = o.user_id) as total_product_reviews,
+                -- นับจำนวนที่เคยซื้อสินค้านี้ทั้งหมดที่สำเร็จแล้ว
+                (SELECT SUM(oi2.quantity) FROM order_items oi2 JOIN orders o2 ON oi2.order_id = o2.id WHERE o2.user_id = o.user_id AND o2.status = 'completed' AND oi2.variant_id IN (SELECT id FROM product_variants WHERE product_id = p.id)) as total_bought
             FROM orders o
             LEFT JOIN order_items oi ON o.id = oi.order_id
             LEFT JOIN product_variants pv ON oi.variant_id = pv.id
@@ -61,6 +65,9 @@ switch ($action) {
             }
 
             if (!empty($row['variant_id'])) {
+                // คำนวณสิทธิ์การรีวิว: รีวิวไปแล้ว < จำนวนที่ซื้อทั้งหมด
+                $canReview = (int)$row['total_product_reviews'] < (int)$row['total_bought'];
+                
                 $orders[$orderId]['items'][] = [
                     'variant_id' => $row['variant_id'],
                     'product_id' => $row['product_id'],
@@ -70,6 +77,8 @@ switch ($action) {
                     'size'       => $row['size'],
                     'price'      => $row['item_price'],
                     'quantity'   => $row['quantity'],
+                    'can_review' => $canReview,
+                    'is_reviewed' => !$canReview
                 ];
             }
         }
@@ -109,7 +118,7 @@ switch ($action) {
             foreach ($items as $item) {
                 $variantId = (int)($item['variant_id'] ?? 0);
                 $quantity  = (int)($item['quantity'] ?? 1);
-                $price     = (float)($item['price'] ?? 0);
+                $price     = (float)$item['price'] ?? 0;
 
                 if (!$variantId || $quantity <= 0) {
                     throw new Exception('Invalid order item data');
@@ -143,5 +152,58 @@ switch ($action) {
             $conn->rollback();
             json_response(["status" => "error", "message" => $e->getMessage()], 500);
         }
+        break;
+
+    case 'admin_get_orders':
+        $stmt = $conn->prepare("SELECT o.*, u.name as user_name, u.email as user_email
+            FROM orders o
+            JOIN users u ON o.user_id = u.id
+            ORDER BY o.created_at DESC");
+        $stmt->execute();
+        $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        
+        foreach ($orders as &$order) {
+            $oId = $order['id'];
+            $stmt = $conn->prepare("SELECT oi.*, p.name as product_name, pv.sku
+                FROM order_items oi
+                JOIN product_variants pv ON oi.variant_id = pv.id
+                JOIN products p ON pv.product_id = p.id
+                WHERE oi.order_id = ?");
+            $stmt->bind_param("i", $oId);
+            $stmt->execute();
+            $order['items'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+            $stmt = $conn->prepare("SELECT * FROM payments WHERE order_id = ? ORDER BY id DESC LIMIT 1");
+            $stmt->bind_param("i", $oId);
+            $stmt->execute();
+            $payment = $stmt->get_result()->fetch_assoc();
+            if ($payment) {
+                $payment['slip_url'] = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . str_replace("api.php", "", $_SERVER['SCRIPT_NAME']) . "uploads/" . $payment['slip_image'];
+            }
+            $order['payment'] = $payment;
+        }
+        json_response($orders);
+        break;
+
+    case 'admin_update_order_status':
+        $data = read_body();
+        $id = (int)$data['id'];
+        $status = $data['status'];
+        $trackingNumber = $data['tracking_number'] ?? null;
+        
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("UPDATE orders SET status=? WHERE id=?");
+            $stmt->bind_param("si", $status, $id);
+            $stmt->execute();
+            if ($status === 'shipping' && $trackingNumber) {
+                $conn->query("DELETE FROM shipments WHERE order_id = $id");
+                $stmt = $conn->prepare("INSERT INTO shipments (order_id, tracking_number) VALUES (?,?)");
+                $stmt->bind_param("is", $id, $trackingNumber);
+                $stmt->execute();
+            }
+            $conn->commit();
+            json_response(["status" => "success"]);
+        } catch (Exception $e) { $conn->rollback(); json_response(["status" => "error", "message" => $e->getMessage()], 500); }
         break;
 }

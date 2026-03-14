@@ -22,9 +22,7 @@ switch ($action) {
         $limit    = 20;
         $offset   = ($page - 1) * $limit;
         $category = isset($_GET['category_id']) ? (int)$_GET['category_id'] : null;
-
         $productSelect = product_select_sql();
-
         if ($category) {
             $stmt = $conn->prepare($productSelect . " WHERE p.category_id=? ORDER BY p.id DESC LIMIT ?,?");
             $stmt->bind_param("iii", $category, $offset, $limit);
@@ -36,152 +34,222 @@ switch ($action) {
         json_response($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
         break;
 
-    case 'get_product':
-        $id   = (int)($_GET['id'] ?? 0);
-        $stmt = $conn->prepare(product_select_sql() . " WHERE p.id = ? LIMIT 1");
-        $stmt->bind_param("i", $id);
+    case 'search_products':
+        $q = $_GET['q'] ?? '';
+        $searchTerm = "%$q%";
+        $productSelect = product_select_sql();
+        $stmt = $conn->prepare($productSelect . " WHERE p.name LIKE ? OR p.brand LIKE ? ORDER BY p.id DESC");
+        $stmt->bind_param("ss", $searchTerm, $searchTerm);
         $stmt->execute();
-        json_response($stmt->get_result()->fetch_assoc());
+        json_response($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
         break;
 
     case 'get_product_detail':
         $id   = (int)$_GET['id'];
-        $stmt = $conn->prepare("SELECT p.*, c.name as category_name,
-            COALESCE(
-                (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1),
-                'https://via.placeholder.com/500'
-            ) as image,
-            (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id) as price,
-            (SELECT pv.sku FROM product_variants pv WHERE pv.product_id = p.id ORDER BY pv.price ASC, pv.id ASC LIMIT 1) as sku,
-            (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) as avg_rating,
-            (SELECT COUNT(*) FROM reviews WHERE product_id = p.id) as total_reviews
-            FROM products p
-            LEFT JOIN categories c ON p.category_id = c.id
-            WHERE p.id = ?");
+        $stmt = $conn->prepare("SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $product = $stmt->get_result()->fetch_assoc();
-
+        
         if ($product) {
+            // Get Images as Array of Strings (Original Format)
             $stmt = $conn->prepare("SELECT image_url FROM product_images WHERE product_id = ?");
-            $stmt->bind_param("i", $id);
-            $stmt->execute();
+            $stmt->bind_param("i", $id); $stmt->execute();
             $product['images'] = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'image_url');
 
-            if (empty($product['images'])) {
-                $product['images'] = [$product['image']];
-            }
-
-            $stmt = $conn->prepare("SELECT
-                    pv.id,
-                    pv.price,
-                    pv.stock,
-                    size_attr.attribute_value as size,
-                    color_attr.attribute_value as color
-                FROM product_variants pv
-                LEFT JOIN variant_attributes size_attr
-                    ON pv.id = size_attr.variant_id AND size_attr.attribute_name = 'size'
-                LEFT JOIN variant_attributes color_attr
-                    ON pv.id = color_attr.variant_id AND color_attr.attribute_name = 'color'
-                WHERE pv.product_id = ?");
-            $stmt->bind_param("i", $id);
-            $stmt->execute();
+            // Get Variants with direct size/color (Original Format for App)
+            $stmt = $conn->prepare("SELECT pv.*, 
+                (SELECT attribute_value FROM variant_attributes WHERE variant_id = pv.id AND attribute_name = 'size') as size,
+                (SELECT attribute_value FROM variant_attributes WHERE variant_id = pv.id AND attribute_name = 'color') as color
+                FROM product_variants pv WHERE pv.product_id = ?");
+            $stmt->bind_param("i", $id); $stmt->execute();
             $product['variants'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-            $stmt = $conn->prepare("SELECT r.*, u.name as user_name
-                FROM reviews r
-                JOIN users u ON r.user_id = u.id
-                WHERE r.product_id = ?
-                ORDER BY r.created_at DESC");
-            $stmt->bind_param("i", $id);
-            $stmt->execute();
-            $reviews = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-            foreach ($reviews as &$review) {
-                $stmt_img = $conn->prepare("SELECT image_url FROM review_images WHERE review_id = ?");
-                $stmt_img->bind_param("i", $review['id']);
-                $stmt_img->execute();
-                $review['photos'] = array_column($stmt_img->get_result()->fetch_all(MYSQLI_ASSOC), 'image_url');
+            // Get Reviews
+            $stmt = $conn->prepare("SELECT r.*, u.name as user_name FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.product_id = ? ORDER BY r.created_at DESC");
+            $stmt->bind_param("i", $id); $stmt->execute();
+            $product['reviews'] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            foreach ($product['reviews'] as &$rev) {
+                $img_stmt = $conn->prepare("SELECT image_url FROM review_images WHERE review_id = ?");
+                $img_stmt->bind_param("i", $rev['id']); $img_stmt->execute();
+                $rev['photos'] = array_column($img_stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'image_url');
             }
-            $product['reviews'] = $reviews;
         }
-
         json_response($product);
         break;
 
-    case 'get_product_images':
-        $id   = (int)$_GET['id'];
-        $stmt = $conn->prepare("SELECT image_url FROM product_images WHERE product_id = ?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        json_response($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
-        break;
-
-    case 'get_product_variants':
-        $id   = (int)$_GET['id'];
-        $stmt = $conn->prepare("SELECT
-                pv.id,
-                pv.price,
-                pv.stock,
-                size_attr.attribute_value as size,
-                color_attr.attribute_value as color
-            FROM product_variants pv
-            LEFT JOIN variant_attributes size_attr
-                ON pv.id = size_attr.variant_id AND size_attr.attribute_name = 'size'
-            LEFT JOIN variant_attributes color_attr
-                ON pv.id = color_attr.variant_id AND color_attr.attribute_name = 'color'
-            WHERE pv.product_id = ?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        json_response($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
-        break;
-
-    case 'get_reviews':
-        $id      = (int)$_GET['id'];
-        $stmt    = $conn->prepare("SELECT r.*, u.name as user_name
-            FROM reviews r
-            JOIN users u ON r.user_id = u.id
-            WHERE r.product_id = ?
-            ORDER BY r.created_at DESC");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        $reviews = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-        foreach ($reviews as &$review) {
-            $r_id      = $review['id'];
-            $img_stmt  = $conn->prepare("SELECT image_url FROM review_images WHERE review_id = ?");
-            $img_stmt->bind_param("i", $r_id);
-            $img_stmt->execute();
-            $review['photos'] = array_column($img_stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'image_url');
-        }
-        json_response($reviews);
-        break;
-
     case 'add_review':
-        $data      = read_body();
-        $productId = (int)$data['product_id'];
-        $userId    = (int)$data['user_id'];
-        $rating    = (int)$data['rating'];
-        $comment   = trim($data['comment'] ?? '');
+        $data = read_body();
+        $productId = (int)($data['product_id'] ?? 0);
+        $userId = (int)($data['user_id'] ?? 0);
+        $rating = (int)($data['rating'] ?? 0);
+        $comment = $data['comment'] ?? '';
+        $photos = $data['photos'] ?? [];
 
         if (!$productId || !$userId || !$rating) {
-            json_response(["status" => "error", "message" => "Missing data"], 400);
+            json_response(["status" => "error", "message" => "Incomplete data"], 400);
         }
 
-        $stmt = $conn->prepare("INSERT INTO reviews(product_id, user_id, rating, comment) VALUES(?,?,?,?)");
-        $stmt->bind_param("iiis", $productId, $userId, $rating, $comment);
-        if ($stmt->execute()) {
-            json_response(["status" => "success", "id" => $stmt->insert_id]);
+        // ── Check Review Eligibility ──
+        // 1. Count how many times this user has bought this product in 'completed' orders
+        $stmtBuy = $conn->prepare("
+            SELECT SUM(oi.quantity) as total_bought 
+            FROM order_items oi 
+            JOIN product_variants pv ON oi.variant_id = pv.id 
+            JOIN orders o ON oi.order_id = o.id 
+            WHERE pv.product_id = ? AND o.user_id = ? AND o.status = 'completed'
+        ");
+        $stmtBuy->bind_param("ii", $productId, $userId);
+        $stmtBuy->execute();
+        $resBuy = $stmtBuy->get_result()->fetch_assoc();
+        $totalBought = (int)($resBuy['total_bought'] ?? 0);
+
+        if ($totalBought === 0) {
+            json_response(["status" => "error", "message" => "คุณต้องซื้อสินค้านี้และได้รับสินค้าเรียบร้อยแล้วจึงจะรีวิวได้"], 403);
         }
-        json_response(["status" => "error"], 500);
+
+        // 2. Count how many reviews the user has already written for this product
+        $stmtReview = $conn->prepare("SELECT COUNT(*) as review_count FROM reviews WHERE product_id = ? AND user_id = ?");
+        $stmtReview->bind_param("ii", $productId, $userId);
+        $stmtReview->execute();
+        $resReview = $stmtReview->get_result()->fetch_assoc();
+        $reviewCount = (int)($resReview['review_count'] ?? 0);
+
+        if ($reviewCount >= $totalBought) {
+            json_response(["status" => "error", "message" => "คุณได้รีวิวสินค้านี้ตามจำนวนครั้งที่ซื้อเรียบร้อยแล้ว"], 403);
+        }
+
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("INSERT INTO reviews(product_id, user_id, rating, comment) VALUES(?,?,?,?)");
+            $stmt->bind_param("iiis", $productId, $userId, $rating, $comment);
+            $stmt->execute();
+            $reviewId = $stmt->insert_id;
+
+            if (!empty($photos)) {
+                $uploadDir = __DIR__ . '/../uploads';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+                $baseUrl = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://" . $_SERVER['HTTP_HOST'] . str_replace("api.php", "", $_SERVER['SCRIPT_NAME']) . "uploads/";
+                foreach ($photos as $photo) {
+                    if (empty($photo)) continue;
+                    $name = "review_" . time() . "_" . uniqid() . ".jpg";
+                    $base64 = $photo;
+                    if (strpos($base64, 'base64,') !== false) $base64 = substr($base64, strpos($base64, 'base64,') + 7);
+                    $decoded = base64_decode($base64);
+                    if ($decoded && file_put_contents($uploadDir . '/' . $name, $decoded)) {
+                        $imgUrl = $baseUrl . $name;
+                        $imgStmt = $conn->prepare("INSERT INTO review_images(review_id, image_url) VALUES(?,?)");
+                        $imgStmt->bind_param("is", $reviewId, $imgUrl);
+                        $imgStmt->execute();
+                    }
+                }
+            }
+            $conn->commit();
+            json_response(["status" => "success", "id" => $reviewId]);
+        } catch (Exception $e) { $conn->rollback(); json_response(["status" => "error", "message" => $e->getMessage()], 500); }
         break;
 
-    case 'search_products':
-        $q    = $_GET['q'] ?? '';
-        $like = "%$q%";
-        $stmt = $conn->prepare(product_select_sql() . " WHERE p.name LIKE ? OR p.brand LIKE ? ORDER BY p.id DESC");
-        $stmt->bind_param("ss", $like, $like);
+    // ── Admin Actions ──────────────────────────────────────
+    case 'admin_get_products':
+        $stmt = $conn->prepare("SELECT p.*, c.name as category_name, 
+            (SELECT SUM(stock) FROM product_variants WHERE product_id = p.id) as total_stock 
+            FROM products p LEFT JOIN categories c ON p.category_id = c.id ORDER BY p.id DESC");
         $stmt->execute();
         json_response($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
+        break;
+
+    case 'admin_save_product':
+        $data = read_body();
+        $id = (int)($data['id'] ?? 0);
+        $name = $data['name']; 
+        $catId = (int)$data['category_id']; 
+        $brand = $data['brand'] ?? '';
+        $desc = $data['description'] ?? '';
+        $variants = $data['variants'] ?? [];
+        $images = $data['images'] ?? [];
+
+        $conn->begin_transaction();
+        try {
+            if ($id > 0) {
+                $stmt = $conn->prepare("UPDATE products SET name=?, category_id=?, brand=?, description=? WHERE id=?");
+                $stmt->bind_param("sissi", $name, $catId, $brand, $desc, $id);
+                $stmt->execute(); $productId = $id;
+            } else {
+                $stmt = $conn->prepare("INSERT INTO products(name, category_id, brand, description) VALUES(?,?,?,?)");
+                $stmt->bind_param("siss", $name, $catId, $brand, $desc);
+                $stmt->execute(); $productId = $conn->insert_id;
+            }
+
+            if (!empty($images)) {
+                $conn->query("DELETE FROM product_images WHERE product_id = $productId");
+                foreach ($images as $img) {
+                    $imgUrl = is_array($img) ? $img['image_url'] : $img;
+                    if (empty($imgUrl)) continue;
+                    $stmt = $conn->prepare("INSERT INTO product_images(product_id, image_url) VALUES(?,?)");
+                    $stmt->bind_param("is", $productId, $imgUrl);
+                    $stmt->execute();
+                }
+            }
+
+            $incomingVariantIds = [];
+            foreach ($variants as $v) {
+                $vId = (int)($v['id'] ?? 0);
+                $price = (float)$v['price']; 
+                $stock = (int)$v['stock']; 
+                $sku = $v['sku'] ?? '';
+                $size = $v['size'] ?? null;
+                $color = $v['color'] ?? null;
+
+                if ($vId > 0) {
+                    $stmt = $conn->prepare("UPDATE product_variants SET price=?, stock=?, sku=? WHERE id=? AND product_id=?");
+                    $stmt->bind_param("disii", $price, $stock, $sku, $vId, $productId);
+                    $stmt->execute();
+                    $varId = $vId;
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO product_variants(product_id, price, stock, sku) VALUES(?,?,?,?)");
+                    $stmt->bind_param("idis", $productId, $price, $stock, $sku);
+                    $stmt->execute();
+                    $varId = $conn->insert_id;
+                }
+                $incomingVariantIds[] = $varId;
+
+                // Sync Attributes
+                $conn->query("DELETE FROM variant_attributes WHERE variant_id = $varId");
+                if ($size) {
+                    $stmt = $conn->prepare("INSERT INTO variant_attributes(variant_id, attribute_name, attribute_value) VALUES(?,'size',?)");
+                    $stmt->bind_param("is", $varId, $size); $stmt->execute();
+                }
+                if ($color) {
+                    $stmt = $conn->prepare("INSERT INTO variant_attributes(variant_id, attribute_name, attribute_value) VALUES(?,'color',?)");
+                    $stmt->bind_param("is", $varId, $color); $stmt->execute();
+                }
+            }
+
+            if ($id > 0 && !empty($incomingVariantIds)) {
+                $idsStr = implode(',', $incomingVariantIds);
+                $conn->query("DELETE FROM variant_attributes WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = $productId AND id NOT IN ($idsStr))");
+                $conn->query("DELETE FROM product_variants WHERE product_id = $productId AND id NOT IN ($idsStr)");
+            }
+
+            $conn->commit();
+            json_response(["status" => "success", "id" => $productId]);
+        } catch (Exception $e) { 
+            $conn->rollback(); 
+            json_response(["status" => "error", "message" => $e->getMessage()], 500); 
+        }
+        break;
+
+    case 'admin_delete_product':
+        $id = (int)$_GET['id'];
+        $conn->begin_transaction();
+        try {
+            $conn->query("DELETE FROM variant_attributes WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = $id)");
+            $conn->query("DELETE FROM product_variants WHERE product_id = $id");
+            $conn->query("DELETE FROM product_images WHERE product_id = $id");
+            $conn->query("DELETE FROM reviews WHERE product_id = $id");
+            $conn->query("DELETE FROM products WHERE id = $id");
+            $conn->commit();
+            json_response(["status" => "success"]);
+        } catch (Exception $e) { $conn->rollback(); json_response(["status" => "error", "message" => $e->getMessage()], 500); }
         break;
 }

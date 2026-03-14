@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  FlatList,
   ActivityIndicator,
   RefreshControl,
   DeviceEventEmitter,
@@ -15,61 +14,108 @@ import { apiService } from '../api/apiService';
 import ConfirmModal from '../components/ConfirmModal';
 import ProductCard from '../components/ProductCard';
 import styles from '../styles/SearchScreen.styles';
-
-const TABS = ['ทั้งหมด', 'Streetwear', 'Luxury', 'ของสะสม', 'มือสอง'];
+import { BLACK, MUTED } from '../utils/constants';
 
 const SearchScreen = ({ navigation }) => {
   const [products, setProducts] = useState([]);
-  const [brands, setBrands] = useState([]);
+  const [categories, setCategories] = useState([{ id: null, name: 'ทั้งหมด' }]);
   const [wishlistIds, setWishlistIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState(0);
-  const [activeFilter, setActiveFilter] = useState(1);
+  const [activeFilter, setActiveFilter] = useState(1); 
+  const [sortOrder, setSortOrder] = useState('asc');
   const [user, setUser] = useState(null);
   const [infoModal, setInfoModal] = useState(null);
 
+  const latestQuery = useRef('');
+  const latestActiveTab = useRef(0);
+  const latestCategories = useRef([{ id: null, name: 'ทั้งหมด' }]);
+
   useEffect(() => {
     initialLoad();
-  }, []);
 
-  useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('searchQuery', (text) => {
-      setQuery(text || '');
-      if (text) {
-        handleSearch(text);
-      } else {
-        fetchProducts();
-      }
+      const trimmedText = text || '';
+      latestQuery.current = trimmedText;
+      setQuery(trimmedText);
+      performSearch();
     });
 
-    return () => {
-      subscription.remove();
-    };
+    // Request current search query from TabBar if it already exists
+    DeviceEventEmitter.emit('requestSearchSync');
+
+    return () => subscription.remove();
   }, []);
 
   const initialLoad = async () => {
     setLoading(true);
-    const userData = await apiService.getUser();
-    setUser(userData);
-    await Promise.all([
-      fetchProducts(), 
-      fetchBrands(),
-      userData ? fetchWishlist(userData.id) : Promise.resolve()
-    ]);
-    setLoading(false);
-  };
-
-  const fetchWishlist = async (userId) => {
     try {
-      const data = await apiService.getWishlist(userId);
-      if (Array.isArray(data)) {
-        setWishlistIds(data.map(item => item.id));
+      const userData = await apiService.getUser();
+      setUser(userData);
+      
+      const [catsData, prodsData] = await Promise.all([
+        apiService.getCategories(),
+        apiService.getProducts()
+      ]);
+
+      if (Array.isArray(catsData)) {
+        const fullCats = [{ id: null, name: 'ทั้งหมด' }, ...catsData];
+        setCategories(fullCats);
+        latestCategories.current = fullCats;
+      }
+      
+      // Only set initial products if we aren't already searching
+      if (!latestQuery.current) {
+        setProducts(Array.isArray(prodsData) ? prodsData : []);
+      } else {
+        performSearch();
+      }
+
+      if (userData) {
+        const wishData = await apiService.getWishlist(userData.id);
+        if (Array.isArray(wishData)) setWishlistIds(wishData.map(item => item.id));
       }
     } catch (error) {
-      console.error('Fetch wishlist error:', error);
+      console.error('Initial load error:', error);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const performSearch = async () => {
+    const searchText = latestQuery.current;
+    const catIndex = latestActiveTab.current;
+    const cats = latestCategories.current;
+
+    setLoading(true);
+    try {
+      if (searchText.trim()) {
+        const data = await apiService.searchProducts(searchText);
+        setProducts(Array.isArray(data) ? data : []);
+      } else {
+        const catId = cats[catIndex]?.id;
+        const data = await apiService.getProducts(catId);
+        setProducts(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTabPress = (index, categoryId) => {
+    setActiveTab(index);
+    latestActiveTab.current = index;
+    // Reset search query when changing tabs manually via screen tabs
+    latestQuery.current = '';
+    setQuery('');
+    performSearch();
+    // Also notify TabBar to clear its input
+    DeviceEventEmitter.emit('clearSearchInput');
   };
 
   const toggleWishlist = async (productId) => {
@@ -77,7 +123,6 @@ const SearchScreen = ({ navigation }) => {
       setInfoModal({ title: 'แจ้งเตือน', message: 'กรุณาเข้าสู่ระบบเพื่อใช้งานสิ่งที่อยากได้' });
       return;
     }
-
     try {
       const result = await apiService.toggleWishlist(user.id, productId);
       if (result.status === 'added') {
@@ -90,159 +135,115 @@ const SearchScreen = ({ navigation }) => {
     }
   };
 
-  const fetchProducts = async () => {
-    try {
-      const data = await apiService.getProducts();
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Fetch products error:', error);
-      setProducts([]);
+  const handleFilterPress = (filterId) => {
+    if (filterId === 2) { 
+      if (activeFilter === 2) {
+        setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+      } else {
+        setActiveFilter(2);
+        setSortOrder('asc');
+      }
+    } else {
+      setActiveFilter(filterId);
     }
   };
 
-  const fetchBrands = async () => {
-    try {
-      const data = await apiService.getProducts();
-      const uniqueBrands = [...new Set(data.map(item => item.brand))].filter(Boolean).map((name, index) => ({ id: String(index), name }));
-      setBrands(uniqueBrands.slice(0, 10));
-    } catch (error) {
-      console.error('Fetch brands error:', error);
+  const filteredProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
+    let result = [...products];
+    if (activeFilter === 2) {
+      result.sort((a, b) => {
+        const priceA = parseFloat(a.price) || 0;
+        const priceB = parseFloat(b.price) || 0;
+        return sortOrder === 'asc' ? priceA - priceB : priceB - priceA;
+      });
+    } else {
+      result.sort((a, b) => b.id - a.id);
     }
-  };
-
-  const handleSearch = async (text) => {
-    try {
-      const data = await apiService.searchProducts(text);
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Search products error:', error);
-    }
-  };
+    return result;
+  }, [products, activeFilter, sortOrder]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const userData = await apiService.getUser();
-    if (query) {
-      await handleSearch(query);
-    } else {
-      await fetchProducts();
+    await performSearch();
+    if (user) {
+      const wishData = await apiService.getWishlist(user.id);
+      if (Array.isArray(wishData)) setWishlistIds(wishData.map(i => i.id));
     }
-    if (userData) await fetchWishlist(userData.id);
     setRefreshing(false);
-  }, [query]);
-
-  const filteredProducts = useMemo(() => {
-    return products;
-  }, [products]);
-
-  const FILTERS = [
-    { id: 0, label: 'พร้อมส่ง', icon: 'flash', iconColor: '#22C55E' },
-    { id: 1, label: 'สำหรับคุณ', icon: 'sparkles', iconColor: '#fff' },
-    { id: 2, label: 'ราคาต่ำ-สูง', icon: 'arrow-up', iconColor: '#333' },
-  ];
+  }, [user]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.tabBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
-          {TABS.map((tab, idx) => (
-            <TouchableOpacity
-              key={idx}
-              style={[styles.tabItem, activeTab === idx && styles.activeTab]}
-              onPress={() => setActiveTab(idx)}
-            >
-              <Text style={[styles.tabText, activeTab === idx && styles.activeTabText]}>
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={styles.brandContainer}>
-        <Text style={styles.sectionTitle}>แบรนด์ยอดนิยม</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-          {brands.map((brand) => (
-            <TouchableOpacity key={brand.id} style={styles.brandItem}>
-              <View style={styles.brandIconPlaceholder}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: '#0D0D0D' }}>
-                  {brand.name ? brand.name.substring(0, 1) : '?'}
-                </Text>
-              </View>
-              <Text style={styles.brandName} numberOfLines={1}>{brand.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={styles.filterBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterScrollContent}
-        >
-          {FILTERS.map((f) => (
-            <TouchableOpacity
-              key={f.id}
-              style={[styles.filterBadge, activeFilter === f.id && styles.activeFilter]}
-              onPress={() => setActiveFilter(f.id)}
-            >
-              <Ionicons
-                name={f.icon}
-                size={13}
-                color={activeFilter === f.id ? '#fff' : f.iconColor}
-              />
-              <Text
-                style={[styles.filterText, activeFilter === f.id && styles.activeFilterText]}
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BLACK} />}
+      >
+        <View style={styles.tabBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
+            {categories.map((cat, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={[styles.tabItem, activeTab === idx && styles.activeTab]}
+                onPress={() => handleTabPress(idx, cat.id)}
               >
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <TouchableOpacity style={styles.filterIconBtn}>
-          <Ionicons name="options-outline" size={20} color="#333" />
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator
-          size="large"
-          color="#0D0D0D"
-          style={{ marginTop: 40 }}
-        />
-      ) : filteredProducts.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="search-outline" size={48} color="#DDD" />
-          <Text style={{ color: '#AAA', marginTop: 12, fontSize: 14 }}>
-            ไม่พบสินค้า "{query}"
-          </Text>
+                <Text style={[styles.tabText, activeTab === idx && styles.activeTabText]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      ) : (
-        <FlatList
-          data={filteredProducts}
-          renderItem={({ item }) => (
-            <ProductCard 
-              product={item} 
-              isWishlisted={wishlistIds.includes(item.id)}
-              onWishlistPress={toggleWishlist}
-              onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-            />
-          )}
-          keyExtractor={(item) => String(item.id)}
-          numColumns={2}
-          contentContainerStyle={[styles.productList, { paddingBottom: 110 }]}
-          showsVerticalScrollIndicator={false}
-          columnWrapperStyle={{ justifyContent: 'space-between' }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#0D0D0D"
-            />
-          }
-        />
-      )}
+
+        <View style={styles.filterBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScrollContent}>
+            {[
+              { id: 1, label: 'สำหรับคุณ', icon: 'sparkles', iconColor: '#333' },
+              { 
+                id: 2, 
+                label: activeFilter === 2 ? (sortOrder === 'asc' ? 'ราคาต่ำ-สูง' : 'ราคาสูง-ต่ำ') : 'ราคา', 
+                icon: activeFilter === 2 ? (sortOrder === 'asc' ? 'arrow-up' : 'arrow-down') : 'swap-vertical', 
+                iconColor: '#333' 
+              }
+            ].map((f) => (
+              <TouchableOpacity
+                key={f.id}
+                style={[styles.filterBadge, activeFilter === f.id && styles.activeFilter]}
+                onPress={() => handleFilterPress(f.id)}
+              >
+                <Ionicons name={f.icon} size={13} color={activeFilter === f.id ? '#fff' : f.iconColor} />
+                <Text style={[styles.filterText, activeFilter === f.id && styles.activeFilterText]}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {loading && !refreshing ? (
+          <ActivityIndicator size="large" color={BLACK} style={{ marginTop: 50 }} />
+        ) : filteredProducts.length === 0 ? (
+          <View style={{ height: 300, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="search-outline" size={48} color="#DDD" />
+            <Text style={{ color: '#AAA', marginTop: 12 }}>
+              {query.trim() ? `ไม่พบสินค้า "${query}"` : 'ไม่พบสินค้าที่คุณต้องการ'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.productListContainer}>
+             {filteredProducts.map((item) => (
+                <View key={item.id} style={{ width: '48%', marginBottom: 15 }}>
+                  <ProductCard 
+                    product={item} 
+                    isWishlisted={wishlistIds.includes(item.id)}
+                    onWishlistPress={toggleWishlist}
+                    onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+                  />
+                </View>
+             ))}
+          </View>
+        )}
+      </ScrollView>
 
       <ConfirmModal
         visible={!!infoModal}
@@ -251,7 +252,6 @@ const SearchScreen = ({ navigation }) => {
         confirmText="ตกลง"
         hideCancel
         onConfirm={() => setInfoModal(null)}
-        onCancel={() => setInfoModal(null)}
       />
     </SafeAreaView>
   );

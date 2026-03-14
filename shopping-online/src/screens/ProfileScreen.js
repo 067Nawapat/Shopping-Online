@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../api/apiService';
@@ -90,7 +91,11 @@ const ProfileScreen = ({ navigation }) => {
         {/* ── Profile Header (Dark) ── */}
         <View style={styles.header}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            {user.avatar ? (
+              <Image source={{ uri: user.avatar }} style={{ width: '100%', height: '100%', borderRadius: 40 }} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
           </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user.name || 'SASOM User'}</Text>
@@ -173,6 +178,20 @@ const ProfileScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── Admin Section (Only for Admins) ── */}
+        {user?.role === 'admin' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>ผู้ดูแลระบบ (Admin)</Text>
+            </View>
+            <MenuItem
+              icon="megaphone-outline"
+              label="ส่งการแจ้งเตือน Push"
+              onPress={() => navigation.navigate('AdminNotification')}
+            />
+          </View>
+        )}
 
         {/* ── Account ── */}
         <View style={styles.section}>

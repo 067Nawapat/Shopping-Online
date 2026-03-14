@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '../api/apiService';
@@ -107,7 +108,11 @@ const UserInfoScreen = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            {user.avatar ? (
+              <Image source={{ uri: user.avatar }} style={{ width: '100%', height: '100%', borderRadius: 40 }} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
           </View>
           <Text style={styles.emailHeader}>{email}</Text>
           <View style={styles.verifiedBadge}>

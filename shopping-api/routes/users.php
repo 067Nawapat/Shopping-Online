@@ -26,7 +26,8 @@ switch ($action) {
 
     case 'get_wishlist':
         $user = (int)$_GET['user_id'];
-        $stmt = $conn->prepare("SELECT
+        $stmt = $conn->prepare("
+            SELECT
                 p.*,
                 COALESCE(
                     (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.id ASC LIMIT 1),
@@ -35,8 +36,7 @@ switch ($action) {
                 COALESCE(
                     (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id),
                     0
-                ) AS price,
-                0 AS sold
+                ) AS price
             FROM wishlist w
             JOIN products p ON w.product_id = p.id
             WHERE w.user_id = ?

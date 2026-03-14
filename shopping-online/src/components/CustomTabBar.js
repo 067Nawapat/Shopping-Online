@@ -46,6 +46,24 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   const activeTabWidth = React.useRef(new Animated.Value(64)).current;
   const [tabLayouts, setTabLayouts] = React.useState({});
 
+  // Search Syncing
+  React.useEffect(() => {
+    const syncSub = DeviceEventEmitter.addListener('requestSearchSync', () => {
+      if (searchText) {
+        DeviceEventEmitter.emit('searchQuery', searchText);
+      }
+    });
+
+    const clearSub = DeviceEventEmitter.addListener('clearSearchInput', () => {
+      setSearchText('');
+    });
+
+    return () => {
+      syncSub.remove();
+      clearSub.remove();
+    };
+  }, [searchText]);
+
   React.useEffect(() => {
     if (!isSearchFocused && isSearchInputActive) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -257,7 +275,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
               <TouchableOpacity activeOpacity={1} style={styles.searchBarContent} onPress={activateSearchInput}>
                 <Ionicons name="search" size={20} color={SEARCH_ICON} />
                 <Text style={[styles.expandedSearchInput, !searchText && styles.searchPlaceholderText]} numberOfLines={1}>
-                  {searchText || 'เกม แอป เรื่องราว และอื่นๆ'}
+                  {searchText || 'ค้นหาสินค้า...'}
                 </Text>
                 <Ionicons name="mic-outline" size={18} color={SEARCH_SECONDARY_ICON} />
               </TouchableOpacity>
@@ -280,7 +298,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 <TextInput
                   ref={searchInputRef}
                   style={styles.searchActiveInput}
-                  placeholder="เกม แอป เรื่องราว และอื่นๆ"
+                  placeholder="ค้นหาสินค้า..."
                   placeholderTextColor={SEARCH_PLACEHOLDER}
                   value={searchText}
                   onChangeText={(text) => {

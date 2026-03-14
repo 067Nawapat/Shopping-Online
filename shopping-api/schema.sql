@@ -220,3 +220,24 @@ CREATE TABLE IF NOT EXISTS shipments (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
+
+-- ตารางเก็บประวัติการแจ้งเตือน
+CREATE TABLE IF NOT EXISTS notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL, -- NULL หมายถึงแจ้งเตือนทุกคน (Global)
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    type VARCHAR(50) DEFAULT 'general', -- เช่น 'order', 'promo', 'system'
+    is_read TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ตารางเก็บ Token ของมือถือเพื่อใช้ส่ง Push Notification
+CREATE TABLE IF NOT EXISTS user_push_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    push_token VARCHAR(255) NOT NULL,
+    device_type ENUM('ios', 'android') DEFAULT 'android',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_user_token (user_id, push_token)
+);
